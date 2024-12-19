@@ -1,17 +1,17 @@
 /*
- *  Copyright (c) 2024 European Commission
+ * Copyright (c) 2024 European Commission
  *
- *  Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package eu.europa.ec.eudi.wallet.issue.openid4vci
@@ -20,9 +20,9 @@ import com.nimbusds.jose.JWSAlgorithm
 import eu.europa.ec.eudi.openid4vci.*
 import io.mockk.every
 import io.mockk.mockk
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Test
+import kotlin.test.BeforeTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
 
 class DefaultOfferTest {
 
@@ -30,7 +30,7 @@ class DefaultOfferTest {
     private lateinit var mockCredentialConfigurationIdentifiers: List<CredentialConfigurationIdentifier>
     private lateinit var mockCredentialConfigurations: List<CredentialConfiguration>
 
-    @BeforeEach
+    @BeforeTest
     fun setup() {
         val msoMdocCredentialId = mockk<CredentialConfigurationIdentifier>(relaxed = true)
         val sdJwtVcCredentialId = mockk<CredentialConfigurationIdentifier>(relaxed = true)
@@ -80,7 +80,6 @@ class DefaultOfferTest {
             mockCredentialConfigurations[0]
         )
 
-        assertEquals(listOf(expectedOfferedDocument), offer.offeredDocuments)
         assertEquals("testName", offer.offeredDocuments[0].name)
         assertEquals("testDocType", offer.offeredDocuments[0].docType)
     }

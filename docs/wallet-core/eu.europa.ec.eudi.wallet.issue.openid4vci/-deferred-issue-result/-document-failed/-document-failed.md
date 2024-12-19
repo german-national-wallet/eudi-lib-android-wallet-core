@@ -3,7 +3,4 @@
 # DocumentFailed
 
 [androidJvm]\
-constructor(documentId: DocumentId,
-name: [String](https://kotlinlang.org/api/latest/jvm/stdlib/kotlin/-string/index.html),
-docType: [String](https://kotlinlang.org/api/latest/jvm/stdlib/kotlin/-string/index.html),
-cause: [Throwable](https://kotlinlang.org/api/latest/jvm/stdlib/kotlin/-throwable/index.html))
+constructor(document: Document, cause: [Throwable](https://kotlinlang.org/api/latest/jvm/stdlib/kotlin/-throwable/index.html))
