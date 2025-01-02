@@ -169,10 +169,21 @@ afterEvaluate {
                 groupId = "com.github.german-first-iteration"
                 artifactId = "eudi-lib-android-wallet-core"
                 version = "0.0.4"
+
+                from(components["java"])
             }
         }
     }
 }
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(libs.versions.java.get()))
+    }
+    sourceCompatibility = JavaVersion.toVersion(libs.versions.java.get())
+    targetCompatibility = JavaVersion.toVersion(libs.versions.java.get())
+}
+
 
 // Dependency check
 
