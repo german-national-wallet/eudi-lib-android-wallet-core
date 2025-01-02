@@ -36,6 +36,10 @@ plugins {
     id("maven-publish")
 }
 
+configurations.all {
+    resolutionStrategy.cacheChangingModulesFor(0, TimeUnit.SECONDS)
+}
+
 jacoco {
     toolVersion = libs.versions.jacoco.get()
 }
