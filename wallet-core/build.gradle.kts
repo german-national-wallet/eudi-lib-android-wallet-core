@@ -173,8 +173,6 @@ afterEvaluate {
                 groupId = "com.github.german-first-iteration"
                 artifactId = "eudi-lib-android-wallet-core"
                 version = "0.0.4"
-
-                from(components["java"])
             }
         }
     }
