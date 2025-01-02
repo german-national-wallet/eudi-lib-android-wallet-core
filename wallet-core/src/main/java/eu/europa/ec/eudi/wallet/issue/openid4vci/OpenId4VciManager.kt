@@ -28,6 +28,7 @@ import eu.europa.ec.eudi.wallet.issue.openid4vci.OpenId4VciManager.Config.ParUsa
 import eu.europa.ec.eudi.wallet.issue.openidvci.PARResponse
 import eu.europa.ec.eudi.wallet.logging.Logger
 import io.ktor.client.*
+import java.net.URL
 import java.util.concurrent.Executor
 
 /**
@@ -347,4 +348,13 @@ interface OpenId4VciManager {
     }
 
     suspend fun performPushAuthorizationRequest(docType: String): PARResponse
+
+    suspend fun issueDocument(
+        authorizationCode: String,
+        serverState: String,
+        redirectUrl: URL,
+        dpopNonce: String,
+        executor: Executor? = null,
+        onIssueEvent: OnIssueEvent,
+    )
 }
