@@ -20,6 +20,7 @@ import com.github.jk1.license.filter.LicenseBundleNormalizer
 import com.github.jk1.license.filter.ReduceDuplicateLicensesFilter
 import com.github.jk1.license.render.InventoryMarkdownReportRenderer
 import com.vanniktech.maven.publish.AndroidMultiVariantLibrary
+import io.grpc.internal.SharedResourceHolder.release
 import java.util.Locale
 
 plugins {
@@ -169,11 +170,16 @@ signing {
 afterEvaluate {
     publishing {
         publications {
-            create<MavenPublication>("mavenJava") {
+            release(MavenPublication) {
+                from components.release
                 groupId = "com.github.german-first-iteration"
                 artifactId = "eudi-lib-android-wallet-core"
                 version = "0.0.4"
             }
+        }
+
+        repositories {
+            mavenLocal() // Publish to the local Maven repository
         }
     }
 }
