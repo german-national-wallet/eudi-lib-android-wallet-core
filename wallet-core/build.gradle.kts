@@ -33,11 +33,6 @@ plugins {
     alias(libs.plugins.sonarqube)
     alias(libs.plugins.maven.publish)
     jacoco
-    id("maven-publish")
-}
-
-configurations.all {
-    resolutionStrategy.cacheChangingModulesFor(0, TimeUnit.SECONDS)
 }
 
 jacoco {
@@ -158,32 +153,6 @@ dependencies {
     androidTestImplementation(libs.espresso.contrib)
     androidTestImplementation(libs.espresso.intents)
 }
-
-signing {
-    setRequired(project.hasProperty("signing.keyId"))
-    sign {
-        publishing.publications
-    }
-}
-
-afterEvaluate {
-    publishing {
-        publications {
-            create<MavenPublication>("mavenJava") {
-                groupId = "com.github.german-first-iteration"
-                artifactId = "eudi-lib-android-wallet-core"
-                version = "0.0.4"
-            }
-        }
-    }
-}
-
-java {
-    toolchain {
-        languageVersion.set(JavaLanguageVersion.of(libs.versions.java.get()))
-    }
-}
-
 
 // Dependency check
 

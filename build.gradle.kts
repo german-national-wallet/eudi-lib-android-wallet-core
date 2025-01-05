@@ -22,4 +22,22 @@ plugins {
     alias(libs.plugins.dependency.license.report) apply false
     alias(libs.plugins.dependencycheck) apply false
     alias(libs.plugins.jetbrains.kotlin.jvm) apply false
+    id("maven-publish")
+}
+
+configurations.all {
+    resolutionStrategy.cacheChangingModulesFor(0, TimeUnit.SECONDS)
+}
+
+afterEvaluate {
+    publishing {
+        publications {
+            create<MavenPublication>("mavenJava") {
+                groupId = "com.github.german-first-iteration"
+                artifactId = "eudi-lib-android-wallet-core"
+                version = "0.0.4"
+
+            }
+        }
+    }
 }
