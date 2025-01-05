@@ -18,18 +18,22 @@ package eu.europa.ec.eudi.wallet.issue.openid4vci
 
 import android.content.Context
 import android.net.Uri
+import eu.europa.ec.eudi.openid4vci.AuthorizationRequestPrepared
+import eu.europa.ec.eudi.openid4vci.CredentialConfigurationIdentifier
 import eu.europa.ec.eudi.openid4vci.DefaultHttpClientFactory
 import eu.europa.ec.eudi.openid4vci.DeferredIssuer
+import eu.europa.ec.eudi.openid4vci.HttpsUrl
+import eu.europa.ec.eudi.openid4vci.Issuer
 import eu.europa.ec.eudi.openid4vci.KtorHttpClientFactory
 import eu.europa.ec.eudi.wallet.document.*
 import eu.europa.ec.eudi.wallet.issue.openidvci.PARResponse
-import eu.europa.ec.eudi.wallet.issue.openidvci.PKCEVerifier
 import eu.europa.ec.eudi.wallet.internal.mainExecutor
 import eu.europa.ec.eudi.wallet.internal.wrappedWithContentNegotiation
 import eu.europa.ec.eudi.wallet.internal.wrappedWithLogging
 import eu.europa.ec.eudi.wallet.issue.openid4vci.IssueEvent.Companion.failure
 import eu.europa.ec.eudi.wallet.logging.Logger
 import kotlinx.coroutines.*
+import java.net.URL
 import java.util.concurrent.Executor
 
 /**
@@ -67,6 +71,11 @@ internal class DefaultOpenId4VciManager(
     private val issuerAuthorization: IssuerAuthorization by lazy {
         IssuerAuthorization(context, logger)
     }
+
+    private lateinit var issuer: Issuer
+    private lateinit var pkceVerifier: eu.europa.ec.eudi.openid4vci.PKCEVerifier
+    private lateinit var credentialConfigurationIdentifierList: List<CredentialConfigurationIdentifier>
+    private lateinit var offer: Offer
 
     override fun issueDocumentByDocType(
         docType: String,
@@ -178,14 +187,71 @@ internal class DefaultOpenId4VciManager(
     }
 
     override suspend fun performPushAuthorizationRequest(docType: String): PARResponse {
-        val offer = offerCreator.createOffer(docType)
-        val issuer = issuerCreator.createIssuer(offer)
+        offer = offerCreator.createOffer(docType)
+        issuer = issuerCreator.createIssuer(offer)
         val parResponse = issuerAuthorization.performPushAuthorizationRequest(issuer)
+        pkceVerifier = eu.europa.ec.eudi.openid4vci.PKCEVerifier(
+            codeVerifier = parResponse.pkceVerifier.codeVerifier,
+            codeVerifierMethod = parResponse.pkceVerifier.codeVerifierMethod
+        )
+        credentialConfigurationIdentifierList = parResponse.identifiersSentAsAuthDetails
         return PARResponse(
             authorizationCodeURL = parResponse.authorizationCodeURL.value,
-            pkceVerifier = PKCEVerifier(codeVerifier = parResponse.pkceVerifier.codeVerifier, codeVerifierMethod = parResponse.pkceVerifier.codeVerifierMethod),
             state = parResponse.state
         )
+    }
+
+    override suspend fun issueDocument(
+        authorizationCode: String,
+        serverState: String,
+        redirectUrl: URL,
+        dpopNonce: String,
+        executor: Executor?,
+        onIssueEvent: OpenId4VciManager.OnIssueEvent
+    ) {
+        launch(executor, onIssueEvent) { coroutineScope, listener ->
+
+            try {
+                var authorizedRequest = issuerAuthorization.authorizeWithAuthorizationCode(
+                    issuer = issuer,
+                    authRequest = AuthorizationRequestPrepared(
+                        authorizationCodeURL = HttpsUrl.invoke(redirectUrl.toString()).getOrThrow(),
+                        pkceVerifier = pkceVerifier,
+                        state = serverState,
+                        identifiersSentAsAuthDetails = credentialConfigurationIdentifierList,
+                    ),
+                    authorizationCode = authorizationCode
+                )
+
+                listener(IssueEvent.Started(offer.offeredDocuments.size))
+                val issuedDocumentIds = mutableListOf<DocumentId>()
+
+                val documentCreator = DocumentCreator(
+                    documentManager = documentManager,
+                    listener = listener,
+                    logger = logger
+                )
+                val requestMap = documentCreator.createDocuments(offer)
+
+                val submit = SubmitRequest(config, issuer, authorizedRequest)
+                val response = submit.request(requestMap).also {
+                    authorizedRequest = submit.authorizedRequest
+                }
+
+                ProcessResponse(
+                    documentManager = documentManager,
+                    deferredContextCreator = DeferredContextCreator(issuer, authorizedRequest),
+                    listener = listener,
+                    issuedDocumentIds = issuedDocumentIds,
+                    logger = logger
+                ).use { it.process(response) }
+
+                listener(IssueEvent.Finished(issuedDocumentIds))
+            } catch (e: Throwable) {
+                listener(failure(e))
+                coroutineScope.cancel("issueDocument failed", e)
+            }
+        }
     }
 
     /**

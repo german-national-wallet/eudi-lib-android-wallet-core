@@ -48,6 +48,19 @@ internal class IssuerAuthorization(
         return issuer.prepareAuthorizationRequest().getOrThrow()
     }
 
+    suspend fun authorizeWithAuthorizationCode(
+        issuer: Issuer,
+        authRequest: AuthorizationRequestPrepared,
+        authorizationCode: String
+    ): AuthorizedRequest {
+        return with(issuer) {
+            authRequest.authorizeWithAuthorizationCode(
+                authorizationCode = AuthorizationCode(code = authorizationCode),
+                serverState = authRequest.state
+            )
+        }.getOrThrow()
+    }
+
     /**
      * Authorizes the given [Issuer] and returns the authorized request.
      * If txCode is provided, it will be used to authorize the issuer,
