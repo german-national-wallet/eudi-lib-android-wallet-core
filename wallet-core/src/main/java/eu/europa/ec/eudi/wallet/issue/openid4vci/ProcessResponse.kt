@@ -82,6 +82,10 @@ internal class ProcessResponse(
             }
         }
     }
+    /*EUDI added */
+
+
+    /*EUDI edded END */
 
     fun processSubmittedRequest(
         unsignedDocument: UnsignedDocument,
