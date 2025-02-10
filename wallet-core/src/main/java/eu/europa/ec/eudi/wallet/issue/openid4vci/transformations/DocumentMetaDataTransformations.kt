@@ -44,7 +44,9 @@ fun OfferedDocument.extractDocumentMetaData(): DocumentMetaData {
             DocumentMetaData.IssuerDisplay(
                 name = it.name ?: "",
                 locale = Locale(it.locale ?: ""),
-                logo = it.logo?.toDocumentLogo()
+                // EUDI-changed
+                // logo = it.logo?.toDocumentLogo()
+                logo = null
             )
         }
     )
