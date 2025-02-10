@@ -44,6 +44,7 @@ internal class ProcessResponse(
     val deferredContextCreator: DeferredContextCreator,
     val listener: OpenId4VciManager.OnResult<IssueEvent>,
     val issuedDocumentIds: MutableList<DocumentId>,
+    val unsignedDocuments: List<UnsignedDocument> = emptyList(),
     val logger: Logger? = null,
 ) : Closeable {
 
@@ -84,33 +85,42 @@ internal class ProcessResponse(
     override fun close() {
     }
 
-    fun processSubmittedRequest(unsignedDocument: UnsignedDocument, outcome: SubmissionOutcome) {
+    private fun processSubmittedRequest(
+        unsignedDocument: UnsignedDocument,
+        outcome: SubmissionOutcome
+    ) {
         when (outcome) {
-            is SubmissionOutcome.Success -> when (val credential =
-                outcome.credentials.first().credential) {
-                is Credential.Json -> TODO("Not supported yet")
-                is Credential.Str -> try {
-                    val issuerData = when (unsignedDocument.format) {
-                        is MsoMdocFormat -> Base64.getUrlDecoder().decode(credential.value)
-                            .also {
-                                logger?.d(TAG, "CBOR bytes: ${Hex.toHexString(it)}")
+            is SubmissionOutcome.Success ->
+                for (i in outcome.credentials.indices) {
+                    when (val credential = outcome.credentials[i].credential) {
+                        is Credential.Json -> TODO("Not supported yet")
+                        is Credential.Str -> try {
+                            val issuerData = when (unsignedDocuments[i].format) {
+                                is MsoMdocFormat -> Base64.getUrlDecoder().decode(credential.value)
+                                    .also {
+                                        logger?.d(TAG, "CBOR bytes: ${Hex.toHexString(it)}")
+                                    }
+
+                                is SdJwtVcFormat -> credential.value.also {
+                                    logger?.d(TAG, "SD-JWT-VC: $it")
+                                }.toByteArray(charset = Charsets.US_ASCII)
+
+                                else -> {
+                                    byteArrayOf() // TODO what is the output when the format is not valid?
+                                }
                             }
 
-                        is SdJwtVcFormat -> credential.value.also {
-                            logger?.d(TAG, "SD-JWT-VC: $it")
-                        }.toByteArray(charset = Charsets.US_ASCII)
+                            documentManager.storeIssuedDocument(unsignedDocuments[i], issuerData)
+                                .kotlinResult
+                                .onSuccess { issuedDocumentIds.add(unsignedDocument.id) }
+                                .notifyListener(unsignedDocument)
+
+                        } catch (e: Throwable) {
+                            documentManager.deleteDocumentById(unsignedDocument.id)
+                            listener(failure(e, unsignedDocument))
+                        }
                     }
-
-                    documentManager.storeIssuedDocument(unsignedDocument, issuerData)
-                        .kotlinResult
-                        .onSuccess { issuedDocumentIds.add(unsignedDocument.id) }
-                        .notifyListener(unsignedDocument)
-
-                } catch (e: Throwable) {
-                    documentManager.deleteDocumentById(unsignedDocument.id)
-                    listener(failure(e, unsignedDocument))
                 }
-            }
 
             is SubmissionOutcome.Failed -> {
                 documentManager.deleteDocumentById(unsignedDocument.id)
