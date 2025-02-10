@@ -121,7 +121,7 @@ class TestDocumentMetaDataTransformations {
                     logo = DocumentMetaData.Logo(
                         uri = URI("https://example.com/logo.png"),
                         alternativeText = "Example Logo"
-                    ),
+                    ),,
                     description = "A description",
                     backgroundColor = "#FFFFFF",
                     textColor = "#000000"

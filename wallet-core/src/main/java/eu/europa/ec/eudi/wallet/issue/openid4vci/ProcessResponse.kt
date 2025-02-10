@@ -44,6 +44,8 @@ internal class ProcessResponse(
     val deferredContextCreator: DeferredContextCreator,
     val listener: OpenId4VciManager.OnResult<IssueEvent>,
     val issuedDocumentIds: MutableList<DocumentId>,
+    // EUDI-added
+    val unsignedDocuments: List<UnsignedDocument> = emptyList(),
     val logger: Logger? = null,
 ) : Closeable {
 
@@ -86,7 +88,9 @@ internal class ProcessResponse(
 
     fun processSubmittedRequest(unsignedDocument: UnsignedDocument, outcome: SubmissionOutcome) {
         when (outcome) {
-            is SubmissionOutcome.Success -> when (val credential =
+            // EUDI-changed: batch issuance
+            // is SubmissionOutcome.Success ->  when (val credential =
+            is SubmissionOutcome.Success -> for (i in outcome.credentials.indices) { val unsignedDocument = unsignedDocuments[i]; when (val credential =
                 outcome.credentials.first().credential) {
                 is Credential.Json -> TODO("Not supported yet")
                 is Credential.Str -> try {
@@ -110,6 +114,8 @@ internal class ProcessResponse(
                     documentManager.deleteDocumentById(unsignedDocument.id)
                     listener(failure(e, unsignedDocument))
                 }
+            }
+            // EUDI-added
             }
 
             is SubmissionOutcome.Failed -> {
