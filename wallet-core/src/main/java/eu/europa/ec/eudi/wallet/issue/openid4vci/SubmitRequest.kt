@@ -29,7 +29,7 @@ internal class SubmitRequest(
     val config: OpenId4VciManager.Config,
     val issuer: Issuer,
     authorizedRequest: AuthorizedRequest,
-    val algorithm: Algorithm = Algorithm.ESP256
+    val algorithm: Algorithm = Algorithm.ES256
 ) {
     var authorizedRequest: AuthorizedRequest = authorizedRequest
         private set
