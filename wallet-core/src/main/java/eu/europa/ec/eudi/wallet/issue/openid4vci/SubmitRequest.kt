@@ -34,51 +34,70 @@ internal class SubmitRequest(
     var authorizedRequest: AuthorizedRequest = authorizedRequest
         private set
 
-    suspend fun request(offeredDocuments: Map<UnsignedDocument, Offer.OfferedDocument>): Response {
-        return Response(offeredDocuments.mapValues { (unsignedDocument, offeredDocument) ->
-            try {
-                Result.success(submitRequest(unsignedDocument, offeredDocument))
-            } catch (e: Throwable) {
-                Result.failure(e)
-            }
-        })
+    /**
+     * Request 1 document presentation at the moment,
+     * This creates a relationship between the main PID document and the rest of credentials
+     */
+    suspend fun request(
+        offeredDocuments: Map<UnsignedDocument, Offer.OfferedDocument>,
+        offer: Offer
+    ): Response {
+        return Response(
+            mapOf(
+                Pair(
+                    offeredDocuments.keys.first(), try {
+                        Result.success(
+                            submitRequest(
+                                offeredDocuments,
+                                offer = offer
+                            )
+                        )
+                    } catch (e: Throwable) {
+                        Result.failure(e)
+                    }
+                )
+            )
+        )
     }
 
     private suspend fun submitRequest(
-        unsignedDocument: UnsignedDocument,
-        offeredDocument: Offer.OfferedDocument,
+        unsignedDocuments: Map<UnsignedDocument, Offer.OfferedDocument>,
         keyUnlockData: KeyUnlockData? = null,
+        offer: Offer
     ): SubmissionOutcome {
-
-        var proofSigner: JWSKeyPoPSigner? = null
+        val offeredDocument = unsignedDocuments.values.first()
+        val proofSigners: MutableList<JWSKeyPoPSigner> = mutableListOf()
         return try {
             val claimSet = null
             val payload = IssuanceRequestPayload.ConfigurationBased(
                 offeredDocument.configurationIdentifier,
                 claimSet
             )
-            proofSigner = JWSKeyPoPSigner(
-                document = unsignedDocument,
-                algorithm = algorithm,
-                keyUnlockData = keyUnlockData
-            )
-            // TODO add more signers for batch_issuance
+            unsignedDocuments.forEach { entry ->
+                proofSigners.add(
+                    JWSKeyPoPSigner(
+                        document = entry.key,
+                        algorithm = algorithm,
+                        keyUnlockData = keyUnlockData
+                    )
+                )
+            }
             val (updatedAuthorizedRequest, outcome) = with(issuer) {
-                authorizedRequest.request(payload, listOf(proofSigner.popSigner))
+                authorizedRequest.request(payload, proofSigners.map { it.popSigner }.toList())
             }.getOrThrow()
-
             this.authorizedRequest = updatedAuthorizedRequest
+
             outcome
         } catch (e: Throwable) {
-            if (null !== proofSigner && null != proofSigner.keyLockedException) {
+            if (null !== proofSigners && null != proofSigners.first().keyLockedException) {
                 throw UserAuthRequiredException(
                     signingAlgorithm = algorithm,
                     resume = { keyUnlockData ->
                         runBlocking {
                             submitRequest(
-                                unsignedDocument,
-                                offeredDocument,
-                                keyUnlockData
+                                unsignedDocuments,
+                                keyUnlockData,
+                                offer = offer
                             )
                         }
                     },

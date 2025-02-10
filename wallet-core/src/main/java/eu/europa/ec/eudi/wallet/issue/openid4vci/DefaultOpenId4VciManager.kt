@@ -22,6 +22,7 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSSigner
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.AuthorizationRequestPrepared
+import eu.europa.ec.eudi.openid4vci.BatchCredentialIssuance
 import eu.europa.ec.eudi.openid4vci.CredentialConfigurationIdentifier
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerId
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadata
@@ -36,6 +37,7 @@ import eu.europa.ec.eudi.openid4vci.PKCEVerifier
 import eu.europa.ec.eudi.wallet.document.DeferredDocument
 import eu.europa.ec.eudi.wallet.document.DocumentId
 import eu.europa.ec.eudi.wallet.document.DocumentManager
+import eu.europa.ec.eudi.wallet.document.UnsignedDocument
 import eu.europa.ec.eudi.wallet.document.format.DocumentFormat
 import eu.europa.ec.eudi.wallet.document.format.MsoMdocFormat
 import eu.europa.ec.eudi.wallet.internal.mainExecutor
@@ -253,7 +255,6 @@ internal class DefaultOpenId4VciManager(
         type: String,
         jwsSigner: JWSSigner,
     ): PARResponse {
-        //TODO handle the new credential issuer configuration
         offer = offerCreator.createOffer(credentialConfigurationId)
         issuer = issuerCreator.createIssuerWithAttestation(
             offer,
@@ -305,7 +306,7 @@ internal class DefaultOpenId4VciManager(
         launch(executor, onIssueEvent) { coroutineScope, listener ->
 
             try {
-                val offer =  Offer(issuer.credentialOffer)
+                val offer = Offer(issuer.credentialOffer)
                 var authorizedRequest = issuerAuthorization.authorizeWithAuthorizationCode(
                     issuer = issuer,
                     authRequest = AuthorizationRequestPrepared(
@@ -318,23 +319,42 @@ internal class DefaultOpenId4VciManager(
                     authorizationCode = authorizationCode
                 )
 
-                listener(IssueEvent.Started(offer.offeredDocuments.size))
                 val issuedDocumentIds = mutableListOf<DocumentId>()
                 val documentCreator = DocumentCreator(
                     documentManager = documentManager,
                     listener = listener,
                     logger = logger
                 )
-                val requestMap = documentCreator.createDocuments(offer)
-                val request = SubmitRequest(config, issuer, authorizedRequest)
-                val response = request.request(requestMap).also {
-                    authorizedRequest = request.authorizedRequest
+
+                val requestMap = mutableMapOf<UnsignedDocument, Offer.OfferedDocument>()
+
+                when (val batchCredentialIssuance =
+                    offer.credentialOffer.credentialIssuerMetadata.batchCredentialIssuance) {
+                    BatchCredentialIssuance.NotSupported -> {
+                        listener(IssueEvent.Started(total = 1))
+                        requestMap.putAll(documentCreator.createDocuments(offer))
+                    }
+
+                    is BatchCredentialIssuance.Supported -> {
+                        listener(IssueEvent.Started(total = batchCredentialIssuance.batchSize))
+                        for (i in 0 until batchCredentialIssuance.batchSize) {
+                            requestMap.putAll(documentCreator.createDocuments(offer))
+                        }
+                    }
                 }
+
+                val request = SubmitRequest(config, issuer, authorizedRequest)
+                val response = request.request(offeredDocuments = requestMap, offer = offer)
+                    .also {
+                        // TODO here we can get the refresh token it is inside the authorizedRequest
+                        authorizedRequest = request.authorizedRequest
+                    }
                 ProcessResponse(
                     documentManager = documentManager,
                     deferredContextCreator = DeferredContextCreator(issuer, authorizedRequest),
                     listener = listener,
                     issuedDocumentIds = issuedDocumentIds,
+                    unsignedDocuments = requestMap.keys.toList(),
                     logger = logger
                 ).use { it.process(response) }
 
@@ -366,7 +386,7 @@ internal class DefaultOpenId4VciManager(
         val requestMap = documentCreator.createDocuments(offer)
 
         val submit = SubmitRequest(config, issuer, authorizedRequest)
-        val response = submit.request(requestMap).also {
+        val response = submit.request(requestMap, offer).also {
             authorizedRequest = submit.authorizedRequest
         }
         ProcessResponse(

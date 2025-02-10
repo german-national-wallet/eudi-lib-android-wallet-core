@@ -118,10 +118,7 @@ class TestDocumentMetaDataTransformations {
                 DocumentMetaData.Display(
                     name = "Example Display",
                     locale = Locale.forLanguageTag("en"),
-                    logo = DocumentMetaData.Logo(
-                        uri = URI("https://example.com/logo.png"),
-                        alternativeText = "Example Logo"
-                    ),
+                    logo = null,
                     description = "A description",
                     backgroundColor = "#FFFFFF",
                     textColor = "#000000"
