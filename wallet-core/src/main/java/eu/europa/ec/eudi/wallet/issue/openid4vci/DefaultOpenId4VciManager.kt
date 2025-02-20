@@ -320,7 +320,9 @@ internal class DefaultOpenId4VciManager(
                         pkceVerifier = pkceVerifier,
                         state = serverState,
                         identifiersSentAsAuthDetails = credentialConfigurationIdentifierList,
-                        dpopNonce = Nonce(dpopNonce)
+                        // EUDI-changed: null dpopNonce
+                        // dpopNonce = Nonce(dpopNonce)
+                        dpopNonce = null
                     ),
                     authorizationCode = authorizationCode
                 )
