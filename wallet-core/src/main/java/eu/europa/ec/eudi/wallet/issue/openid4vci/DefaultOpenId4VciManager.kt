@@ -299,7 +299,6 @@ internal class DefaultOpenId4VciManager(
         authorizationCode: String,
         serverState: String,
         redirectUrl: URL,
-        dpopNonce: String,
         executor: Executor?,
         onIssueEvent: OpenId4VciManager.OnIssueEvent
     ) {
@@ -314,7 +313,7 @@ internal class DefaultOpenId4VciManager(
                         pkceVerifier = pkceVerifier,
                         state = serverState,
                         identifiersSentAsAuthDetails = credentialConfigurationIdentifierList,
-                        dpopNonce = Nonce(dpopNonce)
+                        dpopNonce = null
                     ),
                     authorizationCode = authorizationCode
                 )
