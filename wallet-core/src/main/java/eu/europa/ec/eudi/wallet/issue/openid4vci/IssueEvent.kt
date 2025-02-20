@@ -17,6 +17,7 @@ package eu.europa.ec.eudi.wallet.issue.openid4vci
 
 import com.android.identity.crypto.Algorithm
 import com.android.identity.securearea.KeyUnlockData
+import eu.europa.ec.eudi.openid4vci.RefreshToken
 import eu.europa.ec.eudi.wallet.document.CreateDocumentSettings
 import eu.europa.ec.eudi.wallet.document.DeferredDocument
 import eu.europa.ec.eudi.wallet.document.DocumentId
@@ -114,6 +115,18 @@ sealed interface IssueEvent : OpenId4VciResult {
     data class DocumentDeferred(val document: DeferredDocument) :
         IssueEvent,
         DocumentDetails by DocumentDetails(document)
+
+    // BEGIN EUDI-added
+    /**
+     * Authorization with refresh token
+     * This token can or not be provided by the Issuer, if present should be stored
+     * for future credential issuance
+     *
+     * @property refreshToken the refresh token given by the authorization server
+     */
+
+    data class AuthorizationWithRefreshToken(val refreshToken: RefreshToken?) : IssueEvent
+    // END EUDI-added
 
     companion object {
         internal fun failure(
