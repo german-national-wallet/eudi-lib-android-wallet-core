@@ -352,7 +352,7 @@ internal class DefaultOpenId4VciManager(
                 val request = SubmitRequest(config, issuer, authorizedRequest)
                 val response = request.request(offeredDocuments = requestMap, offer = offer)
                     .also {
-                        // TODO here we can get the refresh token it is inside the authorizedRequest
+                        listener(IssueEvent.AuthorizationWithRefreshToken(request.authorizedRequest.refreshToken))
                         authorizedRequest = request.authorizedRequest
                     }
                 ProcessResponse(
