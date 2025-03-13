@@ -20,6 +20,7 @@ import project.convention.logic.kover.excludeFromKoverReport
 
 // EUDI-removed
 /*
+import com.android.build.gradle.api.LibraryVariant
 import com.github.jk1.license.filter.ExcludeTransitiveDependenciesFilter
 import com.github.jk1.license.filter.LicenseBundleNormalizer
 import com.github.jk1.license.filter.ReduceDuplicateLicensesFilter
@@ -69,7 +70,7 @@ android {
     /*
     namespace = NAMESPACE
     group = GROUP
-    compileSdk = 35
+    compileSdk = 34
 
     defaultConfig {
         minSdk = 26
@@ -86,7 +87,7 @@ android {
     buildTypes {
         debug {
             enableUnitTestCoverage = true
-            enableAndroidTestCoverage = false
+            enableAndroidTestCoverage = true
         }
         release {
             isMinifyEnabled = false
@@ -137,9 +138,8 @@ android {
         }
     }
 
-    androidComponents {
-        onVariants {
-            createJacocoTasks(it.name) }
+    afterEvaluate {
+        libraryVariants.forEach { createJacocoTasks(it) }
     }
     */
 }
@@ -154,6 +154,7 @@ dependencies {
     // EUDI libs
     api(libs.eudi.document.manager)
     api(libs.eudi.iso18013.data.transfer)
+    // EUID-added
     api(libs.eudi.lib.jvm.openid4vci.kt)
     // multipaz library
     api(libs.multipaz.android) {

@@ -16,6 +16,7 @@
 
 package eu.europa.ec.eudi.wallet.issue.openid4vci
 
+import com.nimbusds.jose.JOSEException
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.JWSSigner
@@ -42,18 +43,33 @@ import org.multipaz.crypto.EcPrivateKey
  * @throws Exception If an error occurs during key generation.
  * @see JWSSigner
  */
-internal class JWSDPoPSigner private constructor(val algorithm: Algorithm) : JWSSigner {
+// EUDI-changed
+//internal class JWSDPoPSigner private constructor(val algorithm: Algorithm) : JWSSigner {
+internal class JWSDPoPSigner private constructor(val algorithm: Algorithm, privateKey: EcPrivateKey?) : JWSSigner {
 
     private val privateKey: EcPrivateKey by lazy {
+        // EUDI-added
+        privateKey ?:
         Crypto.createEcPrivateKey(EcCurve.P256)
     }
+
 
     private val jcaContext = JCAContext()
 
     override fun getJCAContext(): JCAContext = jcaContext
 
     private val jwk: JWK
-        get() = JWK.parseFromPEMEncodedObjects(privateKey.publicKey.toPem())
+        // BEGIN EUDI-changed
+        // get() = JWK.parseFromPEMEncodedObjects(privateKey.publicKey.toPem())
+        get() {
+            val pem = privateKey.publicKey.toPem()
+            return try {
+                JWK.parseFromPEMEncodedObjects(pem.trim())
+            } catch (e: JOSEException) {
+                throw IllegalArgumentException("Failed to parse JWK from PEM: ${e.message}", e)
+            }
+        }
+        // END EUDI-changed
 
     private val jwsAlgorithm: JWSAlgorithm = JWSAlgorithm.parse(algorithm.joseAlgorithmIdentifier)
 
@@ -80,9 +96,22 @@ internal class JWSDPoPSigner private constructor(val algorithm: Algorithm) : JWS
          * @return [Result<PopSigner.Jwt>] The result of the operation. If successful, the result contains the [PopSigner.Jwt] instance.
          * If unsuccessful, the result contains the exception that occurred.
          */
-        operator fun invoke(algorithm: Algorithm = Algorithm.ESP256): Result<PopSigner.Jwt> {
+        // EUDI-changed
+        // operator fun invoke(algorithm: Algorithm = Algorithm.ESP256): Result<PopSigner.Jwt> {
+        operator fun invoke(
+            keyProvider: () -> EcPrivateKey? = { null },
+            algorithm: Algorithm = Algorithm.ESP256,
+            ): Result<PopSigner.Jwt> {
             return try {
-                Result.success(JWSDPoPSigner(algorithm).popSigner)
+                // BEGIN EUDI-changed
+                // Result.success(JWSDPoPSigner(algorithm).popSigner)
+                Result.success(
+                    JWSDPoPSigner(
+                        algorithm = algorithm,
+                        keyProvider.invoke()
+                    ).popSigner
+                )
+                // END EUDI-changed
             } catch (e: Exception) {
                 Result.failure(e)
             }

@@ -20,6 +20,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
+import org.multipaz.crypto.Crypto
+import org.multipaz.crypto.EcCurve
 import kotlin.test.Test
 
 
@@ -31,6 +33,7 @@ class OpenId4VciManagerConfigBuilderTest {
             .withIssuerUrl("https://issuer.example.com")
             .withClientId("testClientId")
             .withAuthFlowRedirectionURI("app://redirect")
+            .withPrivateKeySource { Crypto.createEcPrivateKey(EcCurve.P256) }
 
         val config = builder.build()
 
@@ -64,6 +67,7 @@ class OpenId4VciManagerConfigBuilderTest {
         val builder = OpenId4VciManager.Config.Builder()
             .withIssuerUrl("https://issuer.example.com")
             .withClientId("testClientId")
+            .withPrivateKeySource { Crypto.createEcPrivateKey(EcCurve.P256) }
 
         assertThrows(IllegalStateException::class.java) {
             builder.build()
@@ -76,6 +80,7 @@ class OpenId4VciManagerConfigBuilderTest {
             .withIssuerUrl("https://issuer.example.com")
             .withClientId("testClientId")
             .withAuthFlowRedirectionURI("app://redirect")
+            .withPrivateKeySource { Crypto.createEcPrivateKey(EcCurve.P256) }
 
         val config = builder.build()
 
@@ -92,6 +97,7 @@ class OpenId4VciManagerConfigBuilderTest {
             .withClientId("testClientId")
             .withAuthFlowRedirectionURI("app://redirect")
             .withUseDPoPIfSupported(true)
+            .withPrivateKeySource { Crypto.createEcPrivateKey(EcCurve.P256) }
 
         val config = builder.build()
 
