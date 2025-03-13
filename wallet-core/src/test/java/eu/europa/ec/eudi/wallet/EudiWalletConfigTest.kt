@@ -16,6 +16,7 @@
 
 package eu.europa.ec.eudi.wallet
 
+import android.content.Context
 import eu.europa.ec.eudi.wallet.issue.openid4vci.OpenId4VciManager
 import eu.europa.ec.eudi.wallet.logging.Logger
 import eu.europa.ec.eudi.wallet.transfer.openId4vp.ClientIdScheme
@@ -23,6 +24,7 @@ import eu.europa.ec.eudi.wallet.transfer.openId4vp.EncryptionAlgorithm
 import eu.europa.ec.eudi.wallet.transfer.openId4vp.EncryptionMethod
 import eu.europa.ec.eudi.wallet.transfer.openId4vp.Format
 import eu.europa.ec.eudi.wallet.transfer.openId4vp.PreregisteredVerifier
+import io.mockk.every
 import io.mockk.mockk
 import java.security.cert.X509Certificate
 import kotlin.test.Test
@@ -30,8 +32,15 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import org.multipaz.crypto.Crypto
+import org.multipaz.crypto.EcCurve
 
 class EudiWalletConfigTest {
+
+    private val context: Context = mockk(relaxed = true) {
+        every { applicationContext } returns this@mockk
+        every { noBackupFilesDir } returns mockk()
+    }
 
     @Test
     fun testInvoke() {
@@ -45,6 +54,7 @@ class EudiWalletConfigTest {
                 withIssuerUrl("https://example.com")
                 withClientAuthenticationType(OpenId4VciManager.ClientAuthenticationType.AttestationBased)
                 withAuthFlowRedirectionURI("eudi-openid4ci://authorize")
+                withPrivateKeySource { Crypto.createEcPrivateKey(EcCurve.P256) }
             }
             configureOpenId4Vp {
 

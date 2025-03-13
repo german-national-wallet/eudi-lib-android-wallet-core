@@ -27,7 +27,6 @@ import com.github.jk1.license.render.InventoryMarkdownReportRenderer
 import com.vanniktech.maven.publish.AndroidMultiVariantLibrary
 import java.util.Locale
 */
-
 plugins {
     // EUDI-added
     id("project.android.library")
@@ -152,6 +151,8 @@ dependencies {
     // EUDI libs
     api(libs.eudi.document.manager)
     api(libs.eudi.iso18013.data.transfer)
+    // OpenID4VCI
+    // EUID-added
     api(libs.eudi.lib.jvm.openid4vci.kt)
     // multipaz library
     api(libs.multipaz.android) {
@@ -163,7 +164,7 @@ dependencies {
     // EUDI-changed
     // implementation(libs.appcompat)
     implementation(libs.androidx.appcompat)
-    // OpenID4VCI
+
     implementation(libs.nimbus.oauth2.oidc.sdk)
     // Siop-Openid4VP library
     implementation(libs.eudi.lib.jvm.siop.openid4vp.kt) {
@@ -192,7 +193,7 @@ dependencies {
     implementation(libs.bouncy.castle.pkix)
     // EUDI-removed
     // runtimeOnly(libs.ktor.client.android)
-
+    // BEGIN EUDI-added
     implementation(libs.ktor.client.android)
     implementation("io.ktor:ktor-client-content-negotiation:${libs.versions.ktor}")
     implementation("io.ktor:ktor-serialization-kotlinx-json:${libs.versions.ktor}")
