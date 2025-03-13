@@ -145,7 +145,6 @@ dependencies {
     // EUDI libs
     api(libs.eudi.document.manager)
     api(libs.eudi.iso18013.data.transfer)
-    api(libs.eudi.lib.jvm.openid4vci.kt)
     // Identity android library
     api(libs.google.identity.android) {
         exclude(group = "org.bouncycastle")
@@ -155,6 +154,7 @@ dependencies {
     // implementation(libs.appcompat)
     implementation(libs.androidx.appcompat)
     // OpenID4VCI
+    api(libs.eudi.lib.jvm.openid4vci.kt)
     implementation(libs.nimbus.oauth2.oidc.sdk)
     // Siop-Openid4VP library
     implementation(libs.eudi.lib.jvm.siop.openid4vp.kt) {
