@@ -42,18 +42,32 @@ import org.multipaz.crypto.EcPrivateKey
  * @throws Exception If an error occurs during key generation.
  * @see JWSSigner
  */
-internal class JWSDPoPSigner private constructor(val algorithm: Algorithm) : JWSSigner {
+internal class JWSDPoPSigner private constructor(
+    val algorithm: Algorithm,
+    // EUDI ADDED
+    privateKey: EcPrivateKey?,
+) : JWSSigner {
 
+    // EUDI added
     private val privateKey: EcPrivateKey by lazy {
-        Crypto.createEcPrivateKey(EcCurve.P256)
+        privateKey ?: Crypto.createEcPrivateKey(EcCurve.P256)
     }
+
 
     private val jcaContext = JCAContext()
 
     override fun getJCAContext(): JCAContext = jcaContext
 
     private val jwk: JWK
-        get() = JWK.parseFromPEMEncodedObjects(privateKey.publicKey.toPem())
+        // EUDI Added
+        get() {
+            val pem = privateKey.publicKey.toPem()
+            return try {
+                JWK.parseFromPEMEncodedObjects(pem.trim())
+            } catch (e: JOSEException) {
+                throw IllegalArgumentException("Failed to parse JWK from PEM: ${e.message}", e)
+            }
+        }
 
     private val jwsAlgorithm: JWSAlgorithm = JWSAlgorithm.parse(algorithm.joseAlgorithmIdentifier)
 
@@ -80,9 +94,19 @@ internal class JWSDPoPSigner private constructor(val algorithm: Algorithm) : JWS
          * @return [Result<PopSigner.Jwt>] The result of the operation. If successful, the result contains the [PopSigner.Jwt] instance.
          * If unsuccessful, the result contains the exception that occurred.
          */
-        operator fun invoke(algorithm: Algorithm = Algorithm.ESP256): Result<PopSigner.Jwt> {
+        operator fun invoke(
+            // EUDI added
+            keyProvider: () -> EcPrivateKey? = { null },
+            algorithm: Algorithm = Algorithm.ESP256,
+            ): Result<PopSigner.Jwt> {
             return try {
-                Result.success(JWSDPoPSigner(algorithm).popSigner)
+                // EUDI added
+                Result.success(
+                    JWSDPoPSigner(
+                        algorithm = algorithm,
+                        keyProvider.invoke()
+                    ).popSigner
+                )
             } catch (e: Exception) {
                 Result.failure(e)
             }

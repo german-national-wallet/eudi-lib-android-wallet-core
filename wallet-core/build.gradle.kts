@@ -4,13 +4,13 @@ import project.convention.logic.kover.excludeFromKoverReport
 
 /*
  * Copyright (c) 2024-2025 European Commission
- *  
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
- *  
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -20,6 +20,7 @@ import project.convention.logic.kover.excludeFromKoverReport
 
 // EUDI-removed
 /*
+import com.android.build.gradle.api.LibraryVariant
 import com.github.jk1.license.filter.ExcludeTransitiveDependenciesFilter
 import com.github.jk1.license.filter.LicenseBundleNormalizer
 import com.github.jk1.license.filter.ReduceDuplicateLicensesFilter
@@ -27,7 +28,6 @@ import com.github.jk1.license.render.InventoryMarkdownReportRenderer
 import com.vanniktech.maven.publish.AndroidMultiVariantLibrary
 import java.util.Locale
 */
-
 plugins {
     // EUDI-added
     id("project.android.library")
@@ -68,7 +68,7 @@ android {
     /*
     namespace = NAMESPACE
     group = GROUP
-    compileSdk = 35
+    compileSdk = 34
 
     defaultConfig {
         minSdk = 26
@@ -85,7 +85,7 @@ android {
     buildTypes {
         debug {
             enableUnitTestCoverage = true
-            enableAndroidTestCoverage = false
+            enableAndroidTestCoverage = true
         }
         release {
             isMinifyEnabled = false
@@ -103,17 +103,10 @@ android {
         jvmTarget = libs.versions.java.get()
     }
 
-    testOptions {
-        unitTests {
-            isIncludeAndroidResources = true
-        }
-    }
-
     sourceSets.getByName("test").apply {
         res.setSrcDirs(files("resources"))
     }
     */
-
     packaging {
         resources {
             excludes += listOf("/META-INF/{AL2.0,LGPL2.1}")
@@ -127,7 +120,6 @@ android {
             )
         }
     }
-
     // EUDI-removed
     /*
     publishing {
@@ -136,9 +128,8 @@ android {
         }
     }
 
-    androidComponents {
-        onVariants {
-            createJacocoTasks(it.name) }
+    afterEvaluate {
+        libraryVariants.forEach { createJacocoTasks(it) }
     }
     */
 }
@@ -153,6 +144,8 @@ dependencies {
     // EUDI libs
     api(libs.eudi.document.manager)
     api(libs.eudi.iso18013.data.transfer)
+    // OpenID4VCI
+    // EUID-added
     api(libs.eudi.lib.jvm.openid4vci.kt)
     // multipaz library
     api(libs.multipaz.android) {
@@ -163,7 +156,7 @@ dependencies {
     // EUDI-changed
     // implementation(libs.appcompat)
     implementation(libs.androidx.appcompat)
-    // OpenID4VCI
+
     implementation(libs.nimbus.oauth2.oidc.sdk)
     // Siop-Openid4VP library
     implementation(libs.eudi.lib.jvm.siop.openid4vp.kt) {
@@ -193,7 +186,7 @@ dependencies {
     implementation(libs.bouncy.castle.pkix)
     // EUDI-removed
     // runtimeOnly(libs.ktor.client.android)
-
+    // BEGIN EUDI-added
     implementation(libs.ktor.client.android)
     implementation("io.ktor:ktor-client-content-negotiation:${libs.versions.ktor}")
     implementation("io.ktor:ktor-serialization-kotlinx-json:${libs.versions.ktor}")
