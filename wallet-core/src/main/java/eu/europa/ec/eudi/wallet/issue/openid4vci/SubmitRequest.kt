@@ -19,8 +19,11 @@ package eu.europa.ec.eudi.wallet.issue.openid4vci
 import com.android.identity.crypto.Algorithm
 import com.android.identity.securearea.KeyUnlockData
 import eu.europa.ec.eudi.openid4vci.AuthorizedRequest
+import eu.europa.ec.eudi.openid4vci.ClaimName
+import eu.europa.ec.eudi.openid4vci.GenericClaimSet
 import eu.europa.ec.eudi.openid4vci.IssuanceRequestPayload
 import eu.europa.ec.eudi.openid4vci.Issuer
+import eu.europa.ec.eudi.openid4vci.Namespace
 import eu.europa.ec.eudi.openid4vci.SubmissionOutcome
 import eu.europa.ec.eudi.wallet.document.UnsignedDocument
 import kotlinx.coroutines.runBlocking
@@ -107,7 +110,7 @@ internal class SubmitRequest(
 
             outcome
         } catch (e: Throwable) {
-            if (null !== proofSigners && null != proofSigners.first().keyLockedException) {
+            if (null != proofSigners.first().keyLockedException) {
                 throw UserAuthRequiredException(
                     signingAlgorithm = algorithm,
                     resume = { keyUnlockData ->

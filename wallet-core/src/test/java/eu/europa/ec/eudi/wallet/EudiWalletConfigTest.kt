@@ -17,6 +17,8 @@
 package eu.europa.ec.eudi.wallet
 
 import android.content.Context
+import com.android.identity.crypto.Crypto
+import com.android.identity.crypto.EcCurve
 import eu.europa.ec.eudi.wallet.logging.Logger
 import eu.europa.ec.eudi.wallet.transfer.openId4vp.ClientIdScheme
 import eu.europa.ec.eudi.wallet.transfer.openId4vp.EncryptionAlgorithm
@@ -51,6 +53,7 @@ class EudiWalletConfigTest {
                 withIssuerUrl("https://example.com")
                 withClientId("client-id")
                 withAuthFlowRedirectionURI("eudi-openid4ci://authorize")
+                withPrivateKeySource { Crypto.createEcPrivateKey(EcCurve.P256) }
             }
             configureOpenId4Vp {
 
