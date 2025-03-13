@@ -19,6 +19,7 @@ package eu.europa.ec.eudi.wallet.issue.openid4vci
 import android.content.Context
 import android.net.Uri
 import androidx.annotation.IntDef
+import com.android.identity.crypto.EcPrivateKey
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSSigner
 import com.nimbusds.jwt.SignedJWT
@@ -289,6 +290,7 @@ interface OpenId4VciManager {
         val clientId: String,
         val authFlowRedirectionURI: String,
         val useDPoPIfSupported: Boolean = true,
+        val privateKeySource: () -> EcPrivateKey?,
         @ParUsage val parUsage: Int = IF_SUPPORTED,
     ) {
         /**
@@ -330,6 +332,7 @@ interface OpenId4VciManager {
             var clientId: String? = null
             var authFlowRedirectionURI: String? = null
             var useDPoPIfSupported: Boolean = true
+            var privateKeySource: () -> EcPrivateKey? = { null }
 
             @ParUsage
             var parUsage: Int = IF_SUPPORTED
@@ -340,6 +343,9 @@ interface OpenId4VciManager {
              * @return this builder
              */
             fun withIssuerUrl(issuerUrl: String) = apply { this.issuerUrl = issuerUrl }
+
+            fun withPrivateKeySource(keySource: () -> EcPrivateKey) =
+                apply { this.privateKeySource = keySource }
 
             /**
              * Set the client id
@@ -387,7 +393,8 @@ interface OpenId4VciManager {
                     clientId = clientId!!,
                     authFlowRedirectionURI = authFlowRedirectionURI!!,
                     useDPoPIfSupported = useDPoPIfSupported,
-                    parUsage = parUsage
+                    parUsage = parUsage,
+                    privateKeySource = privateKeySource
                 )
             }
         }
@@ -409,6 +416,13 @@ interface OpenId4VciManager {
         serverState: String,
         redirectUrl: URL,
         dpopNonce: String,
+        executor: Executor? = null,
+        onIssueEvent: OnIssueEvent,
+    )
+
+    suspend fun issueDocumentWithRefreshToken(
+        refreshToken: String,
+        credentialType: String,
         executor: Executor? = null,
         onIssueEvent: OnIssueEvent,
     )
