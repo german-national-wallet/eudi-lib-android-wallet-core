@@ -17,11 +17,15 @@
 package eu.europa.ec.eudi.wallet.issue.openid4vci
 
 import android.content.Context
+import com.google.common.base.CharMatcher.any
 import eu.europa.ec.eudi.wallet.document.DocumentManager
 import io.mockk.mockk
 import org.junit.Assert.assertThrows
+import java.security.KeyPairGenerator
 import kotlin.test.Test
 import kotlin.test.assertNotNull
+import org.multipaz.crypto.Crypto
+import org.multipaz.crypto.EcCurve
 
 class OpenId4VciManagerBuilderTest {
 
@@ -33,6 +37,9 @@ class OpenId4VciManagerBuilderTest {
         authFlowRedirectionURI = "app://redirect",
         dPoPUsage = OpenId4VciManager.Config.DPoPUsage.IfSupported(),
         parUsage = OpenId4VciManager.Config.ParUsage.IF_SUPPORTED,
+        privateKeySource = {
+            Crypto.createEcPrivateKey(EcCurve.P256)
+        }
     )
 
     @Test

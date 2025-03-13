@@ -35,6 +35,7 @@ import io.ktor.client.HttpClient
 import org.multipaz.crypto.Algorithm
 import java.net.URL
 import java.util.concurrent.Executor
+import org.multipaz.crypto.EcPrivateKey
 
 /**
  * OpenId4VciManager is the main entry point to issue documents using the OpenId4Vci protocol
