@@ -16,6 +16,7 @@
 
 package eu.europa.ec.eudi.wallet.issue.openid4vci
 
+import com.android.identity.crypto.Algorithm
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSSigner
 import com.nimbusds.jose.jwk.Curve
@@ -57,6 +58,7 @@ internal class IssuerCreator(
         return Issuer.make(config.toOpenId4VCIConfig(), credentialOffer, ktorHttpClientFactory)
             .getOrThrow()
     }
+
     /**
      * Creates an [Issuer] from the given [Offer].
      * @param offer The [Offer].
@@ -66,7 +68,7 @@ internal class IssuerCreator(
         offer: Offer,
         attestationJWT: SignedJWT,
         jwsAlgorithm: JWSAlgorithm,
-        durationInMin : Int,
+        durationInMin: Int,
         type: String,
         jwsSigner: JWSSigner
     ): Issuer {
@@ -84,12 +86,15 @@ internal class IssuerCreator(
         )
             .getOrThrow()
     }
+
     /**
      * Creates an [Issuer] from the given [CredentialConfigurationIdentifier]s.
      * @param credentialConfigurationIdentifiers The [CredentialConfigurationIdentifier]s.
      * @return The [Issuer].
      */
-    suspend fun createIssuer(credentialConfigurationIdentifiers: List<CredentialConfigurationIdentifier>): Issuer {
+    suspend fun createIssuer(
+        credentialConfigurationIdentifiers: List<CredentialConfigurationIdentifier>,
+    ): Issuer {
         return Issuer.makeWalletInitiated(
             config = config.toOpenId4VCIConfig(),
             credentialIssuerId = CredentialIssuerId(config.issuerUrl).getOrThrow(),
@@ -134,7 +139,10 @@ internal class IssuerCreator(
             authFlowRedirectionURI = URI.create(authFlowRedirectionURI),
             keyGenerationConfig = KeyGenerationConfig(Curve.P_256, 2048),
             credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED,
-            dPoPSigner = if (useDPoPIfSupported) JWSDPoPSigner().getOrNull() else null,
+            dPoPSigner = JWSDPoPSigner(
+                keyProvider = config.privateKeySource,
+                algorithm = Algorithm.ES256
+            ).getOrThrow(),
             parUsage = when (parUsage) {
                 OpenId4VciManager.Config.ParUsage.IF_SUPPORTED -> ParUsage.IfSupported
                 OpenId4VciManager.Config.ParUsage.REQUIRED -> ParUsage.Required
@@ -147,7 +155,7 @@ internal class IssuerCreator(
     private fun OpenId4VciManager.Config.toOpenId4VCIConfigWithAttestation(
         attestationJWT: SignedJWT,
         jwsAlgorithm: JWSAlgorithm,
-        durationInMin : Int,
+        durationInMin: Int,
         type: String,
         jwsSigner: JWSSigner,
     ): OpenId4VCIConfig {
@@ -164,7 +172,10 @@ internal class IssuerCreator(
             authFlowRedirectionURI = URI.create(authFlowRedirectionURI),
             keyGenerationConfig = KeyGenerationConfig(Curve.P_256, 2048),
             credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED,
-            dPoPSigner = if (useDPoPIfSupported) JWSDPoPSigner().getOrNull() else null,
+            dPoPSigner = JWSDPoPSigner(
+                keyProvider = config.privateKeySource,
+                algorithm = Algorithm.ES256
+            ).getOrThrow(),
             parUsage = when (parUsage) {
                 OpenId4VciManager.Config.ParUsage.IF_SUPPORTED -> ParUsage.IfSupported
                 OpenId4VciManager.Config.ParUsage.REQUIRED -> ParUsage.Required

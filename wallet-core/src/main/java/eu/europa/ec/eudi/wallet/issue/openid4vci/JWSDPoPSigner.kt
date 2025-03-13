@@ -20,6 +20,7 @@ import com.android.identity.crypto.Algorithm
 import com.android.identity.crypto.Crypto
 import com.android.identity.crypto.EcCurve
 import com.android.identity.crypto.EcPrivateKey
+import com.nimbusds.jose.JOSEException
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.JWSSigner
@@ -42,18 +43,29 @@ import eu.europa.ec.eudi.openid4vci.PopSigner
  * @throws Exception If an error occurs during key generation.
  * @see JWSSigner
  */
-internal class JWSDPoPSigner private constructor(val algorithm: Algorithm) : JWSSigner {
+internal class JWSDPoPSigner private constructor(
+    val algorithm: Algorithm,
+    privateKey: EcPrivateKey?,
+) : JWSSigner {
 
     private val privateKey: EcPrivateKey by lazy {
-        Crypto.createEcPrivateKey(EcCurve.P256)
+        privateKey ?: Crypto.createEcPrivateKey(EcCurve.P256)
     }
+
 
     private val jcaContext = JCAContext()
 
     override fun getJCAContext(): JCAContext = jcaContext
 
     private val jwk: JWK
-        get() = JWK.parseFromPEMEncodedObjects(privateKey.publicKey.toPem())
+        get() {
+            val pem = privateKey.publicKey.toPem()
+            return try {
+                JWK.parseFromPEMEncodedObjects(pem.trim())
+            } catch (e: JOSEException) {
+                throw IllegalArgumentException("Failed to parse JWK from PEM: ${e.message}", e)
+            }
+        }
 
     private val jwsAlgorithm: JWSAlgorithm = JWSAlgorithm.parse(algorithm.jwseAlgorithmIdentifier)
 
@@ -80,9 +92,17 @@ internal class JWSDPoPSigner private constructor(val algorithm: Algorithm) : JWS
          * @return [Result<PopSigner.Jwt>] The result of the operation. If successful, the result contains the [PopSigner.Jwt] instance.
          * If unsuccessful, the result contains the exception that occurred.
          */
-        operator fun invoke(algorithm: Algorithm = Algorithm.ES256): Result<PopSigner.Jwt> {
+        operator fun invoke(
+            keyProvider: () -> EcPrivateKey? = { null },
+            algorithm: Algorithm = Algorithm.ES256,
+        ): Result<PopSigner.Jwt> {
             return try {
-                Result.success(JWSDPoPSigner(algorithm).popSigner)
+                Result.success(
+                    JWSDPoPSigner(
+                        algorithm = algorithm,
+                        keyProvider.invoke()
+                    ).popSigner
+                )
             } catch (e: Exception) {
                 Result.failure(e)
             }
