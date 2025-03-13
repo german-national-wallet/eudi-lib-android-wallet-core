@@ -16,9 +16,11 @@
 
 package eu.europa.ec.eudi.wallet.issue.openid4vci
 
-import org.junit.Assert.assertEquals
+import junit.framework.TestCase.assertEquals
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
+import org.multipaz.crypto.Crypto
+import org.multipaz.crypto.EcCurve
 import kotlin.test.Test
 
 @RunWith(value = Parameterized::class)
@@ -33,21 +35,23 @@ class OpenId4VciManagerConfigBuilderParUsageTest(
             .withClientAuthenticationType(OpenId4VciManager.ClientAuthenticationType.None("testClientId"))
             .withAuthFlowRedirectionURI("app://redirect")
             .withParUsage(parUsage)
+            .withPrivateKeySource { Crypto.createEcPrivateKey(EcCurve.P256) }
 
-        val config = builder.build()
 
-        assertEquals(parUsage, config.parUsage)
-    }
+    val config = builder.build()
 
-    companion object {
+    assertEquals(parUsage, config.parUsage)
+}
 
-        @Parameterized.Parameters(name = "{index}: parUsage={0}")
-        @JvmStatic
-        fun parUsageArgs() = arrayListOf(
-            OpenId4VciManager.Config.ParUsage.IF_SUPPORTED,
-            OpenId4VciManager.Config.ParUsage.REQUIRED,
-            OpenId4VciManager.Config.ParUsage.NEVER
-        )
-    }
+companion object {
+
+    @Parameterized.Parameters(name = "{index}: parUsage={0}")
+    @JvmStatic
+    fun parUsageArgs() = arrayListOf(
+        OpenId4VciManager.Config.ParUsage.IF_SUPPORTED,
+        OpenId4VciManager.Config.ParUsage.REQUIRED,
+        OpenId4VciManager.Config.ParUsage.NEVER
+    )
+}
 
 }
