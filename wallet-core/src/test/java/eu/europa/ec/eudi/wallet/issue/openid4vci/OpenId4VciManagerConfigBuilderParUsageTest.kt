@@ -16,7 +16,9 @@
 
 package eu.europa.ec.eudi.wallet.issue.openid4vci
 
-import org.junit.Assert.assertEquals
+import com.android.identity.crypto.Crypto
+import com.android.identity.crypto.EcCurve
+import junit.framework.TestCase.assertEquals
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 import kotlin.test.Test
@@ -33,6 +35,7 @@ class OpenId4VciManagerConfigBuilderParUsageTest(
             .withClientId("testClientId")
             .withAuthFlowRedirectionURI("app://redirect")
             .withParUsage(parUsage)
+            .withPrivateKeySource { Crypto.createEcPrivateKey(EcCurve.P256) }
 
         val config = builder.build()
 
