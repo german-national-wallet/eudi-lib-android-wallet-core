@@ -22,6 +22,7 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSSigner
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.AuthorizationRequestPrepared
+import eu.europa.ec.eudi.openid4vci.AuthorizedRequest
 import eu.europa.ec.eudi.openid4vci.BatchCredentialIssuance
 import eu.europa.ec.eudi.openid4vci.CredentialConfigurationIdentifier
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerId
@@ -32,7 +33,6 @@ import eu.europa.ec.eudi.openid4vci.DeferredIssuer
 import eu.europa.ec.eudi.openid4vci.HttpsUrl
 import eu.europa.ec.eudi.openid4vci.Issuer
 import eu.europa.ec.eudi.openid4vci.KtorHttpClientFactory
-import eu.europa.ec.eudi.openid4vci.Nonce
 import eu.europa.ec.eudi.openid4vci.PKCEVerifier
 import eu.europa.ec.eudi.wallet.document.DeferredDocument
 import eu.europa.ec.eudi.wallet.document.DocumentId
@@ -45,6 +45,7 @@ import eu.europa.ec.eudi.wallet.internal.wrappedWithContentNegotiation
 import eu.europa.ec.eudi.wallet.internal.wrappedWithLogging
 import eu.europa.ec.eudi.wallet.issue.openid4vci.IssueEvent.Companion.failure
 import eu.europa.ec.eudi.wallet.logging.Logger
+import eu.europa.ec.eudi.wallet.logging.d
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -313,7 +314,7 @@ internal class DefaultOpenId4VciManager(
 
             try {
                 val offer =  Offer(issuer.credentialOffer)
-                var authorizedRequest = issuerAuthorization.authorizeWithAuthorizationCode(
+                val authorizedRequest = issuerAuthorization.authorizeWithAuthorizationCode(
                     issuer = issuer,
                     authRequest = AuthorizationRequestPrepared(
                         authorizationCodeURL = HttpsUrl.invoke(redirectUrl.toString()).getOrThrow(),
@@ -327,56 +328,35 @@ internal class DefaultOpenId4VciManager(
                     authorizationCode = authorizationCode
                 )
 
-                // EUDI-removed: listener call
-                // listener(IssueEvent.Started(offer.offeredDocuments.size))
-                val issuedDocumentIds = mutableListOf<DocumentId>()
-                val documentCreator = DocumentCreator(
-                    documentManager = documentManager,
-                    listener = listener,
-                    logger = logger
-                )
+                listener(IssueEvent.Started(offer.offeredDocuments.size))
 
-                // BEGIN EUDI-changed: Batch issuance
-                /*
-                val requestMap = documentCreator.createDocuments(offer)
-                val request = SubmitRequest(config, issuer, authorizedRequest)
-                val response = request.request(requestMap).also {
-                    authorizedRequest = request.authorizedRequest
-                }
-                */
+                val fixedBatch = 5
+                val documentCreator = DocumentCreator(documentManager, listener, logger)
                 val requestMap = mutableMapOf<UnsignedDocument, Offer.OfferedDocument>()
-
-                when (val batchCredentialIssuance =
-                    offer.credentialOffer.credentialIssuerMetadata.batchCredentialIssuance) {
+                when (offer.credentialOffer.credentialIssuerMetadata.batchCredentialIssuance) {
                     BatchCredentialIssuance.NotSupported -> {
-                        listener(IssueEvent.Started(total = 1))
                         requestMap.putAll(documentCreator.createDocuments(offer))
                     }
-
                     is BatchCredentialIssuance.Supported -> {
-                        listener(IssueEvent.Started(total = batchCredentialIssuance.batchSize))
-                        for (i in 0 until batchCredentialIssuance.batchSize) {
+                        for (i in 0 until fixedBatch) {
                             requestMap.putAll(documentCreator.createDocuments(offer))
                         }
                     }
                 }
 
                 val request = SubmitRequest(config, issuer, authorizedRequest)
-                val response = request.request(offeredDocuments = requestMap, offer = offer)
-                    .also {
-                        // EUDI-added: listener invocation
-                        listener(IssueEvent.AuthorizationWithRefreshToken(request.authorizedRequest.refreshToken))
-                        authorizedRequest = request.authorizedRequest
-                    }
-                // END EUDI-changed: Batch issuance
+                val response = request.request(requestMap, offer).also {
+                    listener(IssueEvent.AuthorizationWithRefreshToken(request.authorizedRequest.refreshToken))
+                }
+
+                val issuedDocumentIds = mutableListOf<DocumentId>()
                 ProcessResponse(
-                    documentManager = documentManager,
-                    deferredContextCreator = DeferredContextCreator(issuer, authorizedRequest),
-                    listener = listener,
-                    issuedDocumentIds = issuedDocumentIds,
-                    // EUDI-added
-                    unsignedDocuments = requestMap.keys.toList(),
-                    logger = logger
+                    documentManager,
+                    DeferredContextCreator(issuer, request.authorizedRequest),
+                    listener,
+                    issuedDocumentIds,
+                    requestMap.keys.toList(),
+                    logger
                 ).use { it.process(response) }
 
                 listener(IssueEvent.Finished(issuedDocumentIds))
@@ -386,7 +366,30 @@ internal class DefaultOpenId4VciManager(
             }
         }
     }
+
+    override suspend fun issueDocumentWithRefreshToken(
+        refreshToken: String,
+        credentialType: String,
+        executor: Executor?,
+        onIssueEvent: OpenId4VciManager.OnIssueEvent
+    ) = launch(executor, onIssueEvent) { _, listener ->
+        try {
+            offer = Offer(issuer.credentialOffer)
+            issuer =
+                issuerCreator.createIssuer(listOf(CredentialConfigurationIdentifier(credentialType)))
+
+            val authorizedRequest = issuer.issueWithRefreshToken(refreshToken).getOrThrow()
+            processDocumentIssuance(authorizedRequest, offer, listener)
+
+        } catch (e: Throwable) {
+            logger?.d(
+                DefaultOpenId4VciManager::class.java.simpleName,
+                "Issue document with refresh token failed:$e"
+            )
+        }
+    }
     // END EUDI-added
+
 
     /**
      * Issues the given [Offer].
