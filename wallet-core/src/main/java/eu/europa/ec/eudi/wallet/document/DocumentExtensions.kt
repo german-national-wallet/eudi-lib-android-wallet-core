@@ -93,14 +93,12 @@ object DocumentExtensions {
         attestationChallenge: ByteArray? = null,
         configure: (AndroidKeystoreCreateKeySettings.Builder.() -> Unit)? = null,
     ): CreateDocumentSettings {
-
         val secureAreaIdentifier = secureAreaRepository
             .implementations
             .filterIsInstance<AndroidKeystoreSecureArea>()
             .firstOrNull()
             ?.identifier
             ?: throw NoSuchElementException("No AndroidKeystoreSecureArea implementation available")
-
 
         val attestationChallengeToUse = attestationChallenge ?: SecureRandom().let { secureRandom ->
             ByteArray(32).also { secureRandom.nextBytes(it) }
