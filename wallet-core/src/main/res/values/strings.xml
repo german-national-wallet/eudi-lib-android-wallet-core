@@ -37,6 +37,18 @@
     <string name="age_over_60">Age over 60?</string>
     <string name="age_over_65">Age over 65?</string>
     <string name="age_over_68">Age over 68?</string>
+    <string name="email_address">Email address</string>
+    <string name="mobile_phone_number">Mobile phone number</string>
+    <string name="location_status">Location status</string>
+    <string name="iat">iat</string>
+    <string name="exp">exp</string>
+    <string name="nationalities">Nationalities</string>
+    <string name="birth_place_region">Region of place of birth</string>
+    <string name="address_formatted">Residence</string>
+    <string name="resident_region">Region of residence</string>
+    <string name="birth_place_locality">Locality of place of birth</string>
+    <string name="birth_place_country">Country of place of birth</string>
+    <string name="resident_locality">Locality of residence</string>
 
     <!-- mDL strings -->
     <string name="mdl_doctype_name">mDL</string>
