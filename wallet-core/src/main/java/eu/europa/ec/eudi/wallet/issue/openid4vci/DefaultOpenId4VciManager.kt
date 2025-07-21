@@ -395,13 +395,14 @@ internal class DefaultOpenId4VciManager(
                 }
 
                 val request = SubmitRequest(config, issuer, authorizedRequest)
-                val response = request.request(offeredDocuments = requestMap, offer = offer)
-                    .also {
-                        // EUDI-added: listener invocation
-                        listener(IssueEvent.AuthorizationWithRefreshToken(request.authorizedRequest.refreshToken))
-                        authorizedRequest = request.authorizedRequest
-                    }
-                // END EUDI-changed: Batch issuance
+                val response = request.request(requestMap, offer).also {
+                    listener(IssueEvent.AuthorizationWithRefreshToken(request.authorizedRequest.refreshToken))
+                }
+
+                val cNonce = (authorizedRequest as AuthorizedRequest.ProofRequired).cNonce
+                listener(IssueEvent.CNonceAvailable(cNonce))
+
+                val issuedDocumentIds = mutableListOf<DocumentId>()
                 ProcessResponse(
                     documentManager = documentManager,
                     deferredContextCreator = DeferredContextCreator(issuer, authorizedRequest),
