@@ -129,6 +129,11 @@ sealed interface IssueEvent : OpenId4VciResult {
      */
 
     data class AuthorizationWithRefreshToken(val refreshToken: RefreshToken?) : IssueEvent
+
+    /**
+     * Passing back the c_nonce to be sign to the RWSCD
+     */
+    data class CNonceAvailable(val cNonce: CNonce) : IssueEvent
     // END EUDI-added
 
     companion object {
