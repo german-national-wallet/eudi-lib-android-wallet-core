@@ -17,6 +17,7 @@ package eu.europa.ec.eudi.wallet.issue.openid4vci
 
 import com.android.identity.crypto.Algorithm
 import com.android.identity.securearea.KeyUnlockData
+import eu.europa.ec.eudi.openid4vci.CNonce
 import eu.europa.ec.eudi.openid4vci.RefreshToken
 import eu.europa.ec.eudi.wallet.document.CreateDocumentSettings
 import eu.europa.ec.eudi.wallet.document.DeferredDocument
@@ -127,6 +128,11 @@ sealed interface IssueEvent : OpenId4VciResult {
 
     data class AuthorizationWithRefreshToken(val refreshToken: RefreshToken?) : IssueEvent
     // END EUDI-added
+
+    /**
+     * Passing back the c_nonce to be sign to the RWSCD
+     */
+    data class CNonceAvailable(val cNonce: CNonce) : IssueEvent
 
     companion object {
         internal fun failure(

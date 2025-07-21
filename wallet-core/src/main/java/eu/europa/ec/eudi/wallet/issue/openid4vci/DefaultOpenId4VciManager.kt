@@ -313,6 +313,8 @@ internal class DefaultOpenId4VciManager(
         try {
             offer = Offer(issuer.credentialOffer)
             val authorizedRequest = authorizeIssuer(authorizationCode, serverState, redirectUrl)
+			val cNonce = (authorizedRequest as AuthorizedRequest.ProofRequired).cNonce
+			listener(IssueEvent.CNonceAvailable(cNonce))
             val issuedDocumentIds = processDocumentIssuance(authorizedRequest, offer, listener)
             listener(IssueEvent.Finished(issuedDocumentIds))
         } catch (e: Throwable) {
