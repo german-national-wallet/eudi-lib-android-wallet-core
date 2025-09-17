@@ -18,30 +18,15 @@
 
     <!-- EU PID -->
     <string name="eu_pid_doctype_name">EU PID</string>
-    <string name="family_name_birth">Geburtsnamen</string>
-    <string name="first_name_birth">First Name at Birth</string>
-    <string name="given_name_birth">Given Name at Birth</string>
-    <string name="birth_country">Country of birth</string>
-    <string name="birth_state">State of birth</string>
-    <string name="birth_city">Geburtsort</string>
+
+
     <string name="resident_house_number">Resident house number</string>
     <string name="gender">Gender</string>
-    <string name="issuance_date">Erstellt am</string>
-    <string name="age_over_12">Alter gleich oder über 21</string>
-    <string name="age_over_13">Alter gleich oder über 13</string>
-    <string name="age_over_14">Alter gleich oder über 14</string>
-    <string name="age_over_15">Alter gleich oder über 15</string>
-    <string name="age_over_16">Alter gleich oder über 16</string>
-    <string name="age_over_18">Alter gleich oder über 18</string>
-    <string name="age_over_60">Alter gleich oder über 60</string>
-    <string name="age_over_65">Alter gleich oder über 65</string>
-    <string name="age_over_68">Alter gleich oder über 68</string>
-    <string name="email_address">Email address</string>
+
     <string name="mobile_phone_number">Mobile phone number</string>
     <string name="location_status">Location status</string>
-    <string name="iat">iat</string>
-    <string name="exp">exp</string>
-    <string name="nationalities">Nationalities</string>
+
+
     <string name="birth_place_region">Region of place of birth</string>
     <string name="address_formatted">Residence</string>
     <string name="resident_region">Region of residence</string>
@@ -51,13 +36,7 @@
 
     <!-- mDL strings -->
     <string name="mdl_doctype_name">mDL</string>
-    <string name="family_name">Name</string>
-    <string name="given_name">Vorname</string>
-    <string name="birth_date">Geburtstag</string>
-    <string name="issue_date">Erstellt am</string>
-    <string name="expiry_date">Gültig bis</string>
-    <string name="issuing_country">Ausstellendes Land</string>
-    <string name="issuing_authority">Behörde</string>
+
     <string name="document_number">Document number</string>
     <string name="portrait">Portrait</string>
     <string name="driving_privileges">Categories of vehicles</string>
@@ -71,26 +50,11 @@
     <string name="birth_place">Geburtsort</string>
     <string name="resident_address">Permanent place of residence</string>
     <string name="portrait_capture_date">Portrait image timestamp</string>
-    <string name="age_in_years">Alter in Jahren</string>
-    <string name="age_birth_year">Geburtsjahr</string>
-    <string name="age_over_21">Alter gleich oder über 21</string>
-    <string name="issuing_jurisdiction">Issuing jurisdiction</string>
-    <string name="nationality">Staatsangehörigkeit</string>
-    <string name="resident_city">Stadt</string>
     <string name="resident_state">Staat</string>
-    <string name="resident_postal_code">Postleitzahl</string>
-    <string name="resident_country">Land</string>
-    <string name="resident_street">Straße</string>
     <string name="family_name_national_character">Family name in national characters</string>
     <string name="given_name_national_character">Given name in national characters</string>
     <string name="signature_usual_mark">Signature / usual mark</string>
 
-    <!-- Labels without details -->
-    <string name="address">Anschrift</string>
-    <string name ="age_equal_or_over">Alter gleich oder über</string>
-
     <!-- Labels Value for UI -->
-    <string name="age_equal_or_over_yes">Ja</string>
-    <string name="age_equal_or_over_no">Nein</string>
     <string name="nationality_value_label_german">DEUTSCH</string>
 </resources>
