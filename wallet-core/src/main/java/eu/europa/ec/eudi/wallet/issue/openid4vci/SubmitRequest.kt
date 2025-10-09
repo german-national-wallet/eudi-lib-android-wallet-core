@@ -62,6 +62,7 @@ internal class SubmitRequest(
                 algorithm = algorithm,
                 keyUnlockData = keyUnlockData
             )
+            // TODO add more signers for batch_issuance
             val (updatedAuthorizedRequest, outcome) = with(issuer) {
                 authorizedRequest.request(payload, listOf(proofSigner.popSigner))
             }.getOrThrow()

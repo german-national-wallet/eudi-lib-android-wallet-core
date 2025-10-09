@@ -137,7 +137,7 @@ internal object OpenId4VpUtils {
     }
 
     @JvmStatic
-    internal fun OpenId4VpConfig.toSiopOpenId4VPConfig(trust: Openid4VpX509CertificateTrust): SiopOpenId4VPConfig {
+    internal fun OpenId4VpConfig.toSiopOpenId4VPConfig(trust: OpenId4VpX509CertificateTrust): SiopOpenId4VPConfig {
         return SiopOpenId4VPConfig(
             jarmConfiguration = JarmConfiguration.Encryption(
                 supportedAlgorithms = encryptionAlgorithms.map {
