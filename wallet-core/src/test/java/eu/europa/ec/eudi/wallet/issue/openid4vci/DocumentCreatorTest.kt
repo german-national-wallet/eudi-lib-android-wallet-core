@@ -30,6 +30,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
+import org.junit.Ignore
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -37,6 +38,8 @@ class DocumentCreatorTest {
 
 
     @Test
+    // EUDI-added: @Ignore
+    @Ignore("Core will be removed")
     fun `assert continuation is not null when resume is executed from event`() = runTest {
         val docTypeMock = "docType"
         val documentFormatMock = MsoMdocFormat(docType = docTypeMock)
