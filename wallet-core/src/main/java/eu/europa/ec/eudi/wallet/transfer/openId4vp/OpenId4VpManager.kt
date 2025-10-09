@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024-2025 European Commission
+ * Copyright (c) 2024 European Commission
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -118,7 +118,7 @@ class OpenId4VpManager(
 
                             is ResolvedRequestObject.SiopAuthentication,
                             is ResolvedRequestObject.SiopOpenId4VPAuthentication,
-                            -> {
+                                -> {
                                 logger?.i(TAG, "${resolvedRequest::class.simpleName} received")
                                 transferEventListeners.onTransferEvent(
                                     TransferEvent.Error(
