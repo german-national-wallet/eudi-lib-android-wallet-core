@@ -33,6 +33,24 @@ internal class IssuerAuthorization(
     private val authorizationHandler: AuthorizationHandler,
     private val logger: Logger? = null,
 ) {
+    // BEGIN EUDI-added
+    suspend fun performPushAuthorizationRequest(issuer: Issuer): AuthorizationRequestPrepared {
+        return issuer.prepareAuthorizationRequest().getOrThrow()
+    }
+
+    suspend fun authorizeWithAuthorizationCode(
+        issuer: Issuer,
+        authRequest: AuthorizationRequestPrepared,
+        authorizationCode: String
+    ): AuthorizedRequest {
+        return with(issuer) {
+            authRequest.authorizeWithAuthorizationCode(
+                authorizationCode = AuthorizationCode(code = authorizationCode),
+                serverState = authRequest.state
+            )
+        }.getOrThrow()
+    }
+    // END EUDI-added
 
     /**
      * Authorizes the given [Issuer] and returns the authorized request.
