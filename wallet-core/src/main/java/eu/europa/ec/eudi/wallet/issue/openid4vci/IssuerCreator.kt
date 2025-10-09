@@ -17,8 +17,13 @@
 package eu.europa.ec.eudi.wallet.issue.openid4vci
 
 import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.JWSSigner
 import com.nimbusds.jose.jwk.Curve
+import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.CIAuthorizationServerMetadata
+import eu.europa.ec.eudi.openid4vci.Client
+import eu.europa.ec.eudi.openid4vci.ClientAttestationJWT
+import eu.europa.ec.eudi.openid4vci.ClientAttestationPoPJWTSpec
 import eu.europa.ec.eudi.openid4vci.CredentialConfigurationIdentifier
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerId
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadata
@@ -38,6 +43,7 @@ import eu.europa.ec.eudi.wallet.issue.openid4vci.CredentialConfigurationFilter.C
 import eu.europa.ec.eudi.wallet.logging.Logger
 import io.ktor.client.HttpClient
 import java.net.URI
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * Creates an [Issuer] from the given [Offer].
@@ -65,6 +71,36 @@ internal class IssuerCreator(
             httpClient = ktorHttpClientFactory()
         ).getOrThrow()
     }
+
+    // BEGIN EUDI-added
+    /**
+     * Creates an [Issuer] from the given [Offer].
+     * @param offer The [Offer].
+     * @return The [Issuer].
+     */
+    fun createIssuerWithAttestation(
+        offer: Offer,
+        attestationJWT: SignedJWT,
+        jwsAlgorithm: JWSAlgorithm,
+        durationInMin : Int,
+        type: String,
+        jwsSigner: JWSSigner
+    ): Issuer {
+        val credentialOffer = offer.credentialOffer
+        return Issuer.make(
+            config.toOpenId4VCIConfigWithAttestation(
+                attestationJWT = attestationJWT,
+                jwsAlgorithm = jwsAlgorithm,
+                durationInMin = durationInMin,
+                type = type,
+                jwsSigner = jwsSigner,
+            ),
+            credentialOffer,
+            ktorHttpClientFactory
+        )
+            .getOrThrow()
+    }
+    // END EUDI-added
 
     /**
      * Creates an [Issuer] from the given [CredentialConfigurationIdentifier]s.
@@ -198,4 +234,36 @@ internal class IssuerCreator(
             }
         )
     }
+
+    // BEGIN EUDI-added
+    private fun OpenId4VciManager.Config.toOpenId4VCIConfigWithAttestation(
+        attestationJWT: SignedJWT,
+        jwsAlgorithm: JWSAlgorithm,
+        durationInMin : Int,
+        type: String,
+        jwsSigner: JWSSigner,
+    ): OpenId4VCIConfig {
+        return OpenId4VCIConfig(
+            client = Client.Attested(
+                ClientAttestationJWT(attestationJWT),
+                ClientAttestationPoPJWTSpec(
+                    signingAlgorithm = jwsAlgorithm,
+                    duration = durationInMin.minutes,
+                    typ = type,
+                    jwsSigner = jwsSigner
+                )
+            ),
+            authFlowRedirectionURI = URI.create(authFlowRedirectionURI),
+            keyGenerationConfig = KeyGenerationConfig(Curve.P_256, 2048),
+            credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED,
+            dPoPSigner = if (useDPoPIfSupported) JWSDPoPSigner().getOrNull() else null,
+            parUsage = when (parUsage) {
+                OpenId4VciManager.Config.ParUsage.IF_SUPPORTED -> ParUsage.IfSupported
+                OpenId4VciManager.Config.ParUsage.REQUIRED -> ParUsage.Required
+                OpenId4VciManager.Config.ParUsage.NEVER -> ParUsage.Never
+                else -> ParUsage.IfSupported
+            }
+        )
+    }
+    // END EUDI-added
 }
