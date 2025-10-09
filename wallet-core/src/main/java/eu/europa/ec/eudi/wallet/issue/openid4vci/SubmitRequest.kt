@@ -61,6 +61,7 @@ internal class SubmitRequest(
                 unsignedDocument.getPoPSigners().map { s ->
                     JWSKeyPoPSigner(s, keyUnlockData?.get(s.keyAlias))
                 }
+            // EUDI-note: TODO add more signers for batch_issuance
             val (updatedAuthorizedRequest, outcome) = with(issuer) {
                 authorizedRequest.request(payload, proofSigners.map { it.popSigner })
             }.getOrThrow()
