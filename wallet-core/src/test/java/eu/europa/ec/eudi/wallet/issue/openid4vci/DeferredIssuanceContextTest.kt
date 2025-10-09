@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 European Commission
+ * Copyright (c) 2024-2025 European Commission
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ import eu.europa.ec.eudi.openid4vci.DeferredIssuanceContext
 import eu.europa.ec.eudi.openid4vci.RefreshToken
 import io.mockk.every
 import io.mockk.mockk
-import org.junit.Ignore
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertFalse
