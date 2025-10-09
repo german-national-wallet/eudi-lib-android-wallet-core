@@ -19,7 +19,7 @@ import eu.europa.ec.eudi.iso18013.transfer.readerauth.ReaderTrustStore
 import eu.europa.ec.eudi.openid4vp.X509CertificateTrust
 import java.security.cert.X509Certificate
 
-internal class Openid4VpX509CertificateTrust(
+internal class OpenId4VpX509CertificateTrust(
     private var readerTrustStore: ReaderTrustStore?,
 ) : X509CertificateTrust {
 
