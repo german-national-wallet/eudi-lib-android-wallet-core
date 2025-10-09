@@ -19,6 +19,9 @@ package eu.europa.ec.eudi.wallet.issue.openid4vci
 import android.content.Context
 import android.net.Uri
 import androidx.annotation.IntDef
+import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.JWSSigner
+import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.CredentialConfigurationIdentifier
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadata
 import eu.europa.ec.eudi.wallet.document.DeferredDocument
@@ -32,6 +35,7 @@ import eu.europa.ec.eudi.wallet.provider.WalletAttestationsProvider
 import eu.europa.ec.eudi.wallet.provider.WalletKeyManager
 import io.ktor.client.HttpClient
 import org.multipaz.crypto.Algorithm
+import java.net.URL
 import java.util.concurrent.Executor
 
 /**
@@ -522,4 +526,24 @@ interface OpenId4VciManager {
             }
         }
     }
+
+    suspend fun performPushAuthorizationRequest(
+        credentialConfigurationId: String,
+        attestationJWT: SignedJWT,
+        jwsAlgorithm: JWSAlgorithm,
+        durationInMin: Int,
+        type: String,
+        jwsSigner: JWSSigner,
+    ): PARResponse
+
+    suspend fun performPushAuthorizationRequest(credentialConfigurationId: String): PARResponse
+
+    suspend fun issueDocument(
+        authorizationCode: String,
+        serverState: String,
+        redirectUrl: URL,
+        dpopNonce: String,
+        executor: Executor? = null,
+        onIssueEvent: OnIssueEvent,
+    )
 }

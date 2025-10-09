@@ -19,13 +19,21 @@ package eu.europa.ec.eudi.wallet.issue.openid4vci
 import android.content.Context
 import android.net.Uri
 import androidx.core.net.toUri
+import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.JWSSigner
+import com.nimbusds.jwt.SignedJWT
+import eu.europa.ec.eudi.openid4vci.AuthorizationRequestPrepared
 import eu.europa.ec.eudi.openid4vci.CredentialConfigurationIdentifier
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerId
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadata
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataResolver
 import eu.europa.ec.eudi.openid4vci.DeferredIssuer
+import eu.europa.ec.eudi.openid4vci.HttpsUrl
 import eu.europa.ec.eudi.openid4vci.Issuer
 import eu.europa.ec.eudi.openid4vci.IssuerMetadataPolicy
+import eu.europa.ec.eudi.openid4vci.KtorHttpClientFactory
+import eu.europa.ec.eudi.openid4vci.Nonce
+import eu.europa.ec.eudi.openid4vci.PKCEVerifier
 import eu.europa.ec.eudi.wallet.document.DeferredDocument
 import eu.europa.ec.eudi.wallet.document.DocumentId
 import eu.europa.ec.eudi.wallet.document.DocumentManager
@@ -46,6 +54,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import java.net.URL
 import java.util.concurrent.Executor
 
 /**
@@ -73,6 +82,10 @@ internal class DefaultOpenId4VciManager(
             .wrappedWithLogging(logger)
             .wrappedWithContentNegotiation()
 
+    // EUDI-added
+    private val offerCreator: OfferCreator by lazy {
+        OfferCreator(config, httpClientFactory)
+    }
     private val offerResolver: OfferResolver by lazy {
         OfferResolver(httpClientFactory)
     }
@@ -89,6 +102,13 @@ internal class DefaultOpenId4VciManager(
         val handler = config.authorizationHandler ?: BrowserAuthorizationHandler(context, logger)
         IssuerAuthorization(handler, logger)
     }
+
+    // BEGIN EUDI-added
+    private lateinit var issuer: Issuer
+    private lateinit var pkceVerifier: PKCEVerifier
+    private lateinit var credentialConfigurationIdentifierList: List<CredentialConfigurationIdentifier>
+    private lateinit var offer: Offer
+    // END EUDI-added
 
     override suspend fun getIssuerMetadata(): Result<CredentialIssuerMetadata> {
         return CredentialIssuerId(config.issuerUrl).mapCatching {
@@ -262,6 +282,109 @@ internal class DefaultOpenId4VciManager(
     override fun resumeWithAuthorization(uri: String) {
         resumeWithAuthorization(uri.toUri())
     }
+
+    // BEGIN EUDI-added
+    override suspend fun performPushAuthorizationRequest(
+        credentialConfigurationId: String,
+        attestationJWT: SignedJWT,
+        jwsAlgorithm: JWSAlgorithm,
+        durationInMin: Int,
+        type: String,
+        jwsSigner: JWSSigner,
+    ): PARResponse {
+        //TODO handle the new credential issuer configuration
+        offer = offerCreator.createOffer(credentialConfigurationId)
+        issuer = issuerCreator.createIssuerWithAttestation(
+            offer,
+            attestationJWT = attestationJWT,
+            jwsAlgorithm = jwsAlgorithm,
+            durationInMin = durationInMin,
+            type = type,
+            jwsSigner = jwsSigner,
+        )
+        val parResponse = issuerAuthorization.performPushAuthorizationRequest(issuer)
+        pkceVerifier = PKCEVerifier(
+            codeVerifier = parResponse.pkceVerifier.codeVerifier,
+            codeVerifierMethod = parResponse.pkceVerifier.codeVerifierMethod
+        )
+        credentialConfigurationIdentifierList = parResponse.identifiersSentAsAuthDetails
+        return PARResponse(
+            authorizationCodeURL = parResponse.authorizationCodeURL.value,
+            state = parResponse.state
+        )
+    }
+
+    override suspend fun performPushAuthorizationRequest(credentialConfigurationId: String): PARResponse {
+        issuer = issuerCreator.createIssuer(
+            listOf(
+                CredentialConfigurationIdentifier(credentialConfigurationId)
+            )
+        )
+
+        val parResponse = issuerAuthorization.performPushAuthorizationRequest(issuer)
+        pkceVerifier = PKCEVerifier(
+            codeVerifier = parResponse.pkceVerifier.codeVerifier,
+            codeVerifierMethod = parResponse.pkceVerifier.codeVerifierMethod
+        )
+        credentialConfigurationIdentifierList = parResponse.identifiersSentAsAuthDetails
+        return PARResponse(
+            authorizationCodeURL = parResponse.authorizationCodeURL.value,
+            state = parResponse.state
+        )
+    }
+
+    override suspend fun issueDocument(
+        authorizationCode: String,
+        serverState: String,
+        redirectUrl: URL,
+        dpopNonce: String,
+        executor: Executor?,
+        onIssueEvent: OpenId4VciManager.OnIssueEvent
+    ) {
+        launch(executor, onIssueEvent) { coroutineScope, listener ->
+
+            try {
+                val offer = Offer(issuer.credentialOffer)
+                var authorizedRequest = issuerAuthorization.authorizeWithAuthorizationCode(
+                    issuer = issuer,
+                    authRequest = AuthorizationRequestPrepared(
+                        authorizationCodeURL = HttpsUrl.invoke(redirectUrl.toString()).getOrThrow(),
+                        pkceVerifier = pkceVerifier,
+                        state = serverState,
+                        identifiersSentAsAuthDetails = credentialConfigurationIdentifierList,
+                        dpopNonce = Nonce(dpopNonce)
+                    ),
+                    authorizationCode = authorizationCode
+                )
+
+                listener(IssueEvent.Started(offer.offeredDocuments.size))
+                val issuedDocumentIds = mutableListOf<DocumentId>()
+                val documentCreator = DocumentCreator(
+                    documentManager = documentManager,
+                    listener = listener,
+                    logger = logger
+                )
+                val requestMap = documentCreator.createDocuments(offer)
+                val request = SubmitRequest(config, issuer, authorizedRequest)
+                val response = request.request(requestMap).also {
+                    authorizedRequest = request.authorizedRequest
+                }
+                ProcessResponse(
+                    documentManager = documentManager,
+                    deferredContextCreator = DeferredContextCreator(issuer, authorizedRequest),
+                    listener = listener,
+                    issuedDocumentIds = issuedDocumentIds,
+                    logger = logger
+                ).use { it.process(response) }
+
+                listener(IssueEvent.Finished(issuedDocumentIds))
+            } catch (e: Throwable) {
+                listener(failure(e))
+                coroutineScope.cancel("issueDocument failed", e)
+            }
+        }
+    }
+    // END EUDI-added
 
     /**
      * Issues the given [Offer].
