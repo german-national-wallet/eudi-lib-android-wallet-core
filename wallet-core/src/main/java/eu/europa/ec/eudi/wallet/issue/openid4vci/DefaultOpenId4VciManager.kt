@@ -71,7 +71,7 @@ internal class DefaultOpenId4VciManager(
     var ktorHttpClientFactory: KtorHttpClientFactory? = null,
 ) : OpenId4VciManager {
 
-    private val httpClientFactory
+    internal val httpClientFactory
         get() = (ktorHttpClientFactory ?: DefaultHttpClientFactory)
             .wrappedWithLogging(logger)
             .wrappedWithContentNegotiation()
@@ -309,15 +309,61 @@ internal class DefaultOpenId4VciManager(
         dpopNonce: String,
         executor: Executor?,
         onIssueEvent: OpenId4VciManager.OnIssueEvent
-    ) = launch(executor, onIssueEvent) { coroutineScope, listener ->
-        try {
-            offer = Offer(issuer.credentialOffer)
-            val authorizedRequest = authorizeIssuer(authorizationCode, serverState, redirectUrl)
-            val issuedDocumentIds = processDocumentIssuance(authorizedRequest, offer, listener)
-            listener(IssueEvent.Finished(issuedDocumentIds))
-        } catch (e: Throwable) {
-            listener(failure(e))
-            coroutineScope.cancel("Issue document failed", e)
+    ) {
+        launch(executor, onIssueEvent) { coroutineScope, listener ->
+
+            try {
+                val offer =  Offer(issuer.credentialOffer)
+                val authorizedRequest = issuerAuthorization.authorizeWithAuthorizationCode(
+                    issuer = issuer,
+                    authRequest = AuthorizationRequestPrepared(
+                        authorizationCodeURL = HttpsUrl.invoke(redirectUrl.toString()).getOrThrow(),
+                        pkceVerifier = pkceVerifier,
+                        state = serverState,
+                        identifiersSentAsAuthDetails = credentialConfigurationIdentifierList,
+                        // EUDI-changed: null dpopNonce
+                        // dpopNonce = Nonce(dpopNonce)
+                        dpopNonce = null
+                    ),
+                    authorizationCode = authorizationCode
+                )
+
+                listener(IssueEvent.Started(offer.offeredDocuments.size))
+
+                val fixedBatch = 5
+                val documentCreator = DocumentCreator(documentManager, listener, logger)
+                val requestMap = mutableMapOf<UnsignedDocument, Offer.OfferedDocument>()
+                when (offer.credentialOffer.credentialIssuerMetadata.batchCredentialIssuance) {
+                    BatchCredentialIssuance.NotSupported -> {
+                        requestMap.putAll(documentCreator.createDocuments(offer))
+                    }
+                    is BatchCredentialIssuance.Supported -> {
+                        for (i in 0 until fixedBatch) {
+                            requestMap.putAll(documentCreator.createDocuments(offer))
+                        }
+                    }
+                }
+
+                val request = SubmitRequest(config, issuer, authorizedRequest)
+                val response = request.request(requestMap, offer).also {
+                    listener(IssueEvent.AuthorizationWithRefreshToken(request.authorizedRequest.refreshToken))
+                }
+
+                val issuedDocumentIds = mutableListOf<DocumentId>()
+                ProcessResponse(
+                    documentManager,
+                    DeferredContextCreator(issuer, request.authorizedRequest),
+                    listener,
+                    issuedDocumentIds,
+                    requestMap.keys.toList(),
+                    logger
+                ).use { it.process(response) }
+
+                listener(IssueEvent.Finished(issuedDocumentIds))
+            } catch (e: Throwable) {
+                listener(failure(e))
+                coroutineScope.cancel("issueDocument failed", e)
+            }
         }
     }
 
@@ -341,70 +387,6 @@ internal class DefaultOpenId4VciManager(
                 "Issue document with refresh token failed:$e"
             )
         }
-    }
-
-    /**
-     * Handles authorization with an authorization code.
-     */
-    private suspend fun authorizeIssuer(
-        authorizationCode: String,
-        serverState: String,
-        redirectUrl: URL
-    ): AuthorizedRequest {
-        val authRequest = AuthorizationRequestPrepared(
-            authorizationCodeURL = HttpsUrl.invoke(redirectUrl.toString()).getOrThrow(),
-            pkceVerifier = pkceVerifier,
-            state = serverState,
-            identifiersSentAsAuthDetails = credentialConfigurationIdentifierList,
-            dpopNonce = null
-        )
-        return issuerAuthorization.authorizeWithAuthorizationCode(
-            issuer,
-            authRequest,
-            authorizationCode
-        )
-    }
-
-    /**
-     * Handles document issuance workflow, from document creation to submission.
-     */
-    private suspend fun processDocumentIssuance(
-        authorizedRequest: AuthorizedRequest,
-        offer: Offer,
-        listener: OpenId4VciManager.OnResult<IssueEvent>
-    ): List<DocumentId> {
-        listener(IssueEvent.Started(offer.offeredDocuments.size))
-
-        val fixedBatch = 5
-        val documentCreator = DocumentCreator(documentManager, listener, logger)
-        val requestMap = mutableMapOf<UnsignedDocument, Offer.OfferedDocument>()
-        when (offer.credentialOffer.credentialIssuerMetadata.batchCredentialIssuance) {
-            BatchCredentialIssuance.NotSupported -> {
-                requestMap.putAll(documentCreator.createDocuments(offer))
-            }
-            is BatchCredentialIssuance.Supported -> {
-                for (i in 0 until fixedBatch) {
-                    requestMap.putAll(documentCreator.createDocuments(offer))
-                }
-            }
-        }
-
-        val submit = SubmitRequest(config, issuer, authorizedRequest)
-        val response = submit.request(requestMap, offer).also {
-            listener(IssueEvent.AuthorizationWithRefreshToken(submit.authorizedRequest.refreshToken))
-        }
-
-        val issuedDocumentIds = mutableListOf<DocumentId>()
-        ProcessResponse(
-            documentManager,
-            DeferredContextCreator(issuer, submit.authorizedRequest),
-            listener,
-            issuedDocumentIds,
-            requestMap.keys.toList(),
-            logger
-        ).use { it.process(response) }
-
-        return issuedDocumentIds
     }
     // END EUDI-added
 
