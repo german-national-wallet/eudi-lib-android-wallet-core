@@ -408,6 +408,7 @@ interface OpenId4VciManager {
         authorizationCode: String,
         serverState: String,
         redirectUrl: URL,
+        dpopNonce: String,
         executor: Executor? = null,
         onIssueEvent: OnIssueEvent,
     )
