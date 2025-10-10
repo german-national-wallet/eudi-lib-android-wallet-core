@@ -34,6 +34,17 @@ internal class SubmitRequest(
     var authorizedRequest: AuthorizedRequest = authorizedRequest
         private set
 
+    // BEGIN EUDI-changed
+    /*
+    suspend fun request(offeredDocuments: Map<UnsignedDocument, Offer.OfferedDocument>): Response {
+        return Response(offeredDocuments.mapValues { (unsignedDocument, offeredDocument) ->
+            try {
+                Result.success(submitRequest(unsignedDocument, offeredDocument))
+            } catch (e: Throwable) {
+                Result.failure(e)
+            }
+        })
+    */
     /**
      * Request 1 document presentation at the moment,
      * This creates a relationship between the main PID document and the rest of credentials
@@ -59,11 +70,18 @@ internal class SubmitRequest(
             )
         )
     }
+    // END EUDI-changed
 
     private suspend fun submitRequest(
+        // BEGIN EUDI-changed
+        /*
+        unsignedDocument: UnsignedDocument,
+        offeredDocument: Offer.OfferedDocument,
+        */
         unsignedDocuments: Map<UnsignedDocument, Offer.OfferedDocument>,
-        keyUnlockData: KeyUnlockData? = null,
-        offer: Offer
+        offer: Offer,
+        // END EUDI-changed
+        keyUnlockData: KeyUnlockData? = null
     ): SubmissionOutcome {
         val offeredDocument = unsignedDocuments.values.first()
         val proofSigners: MutableList<JWSKeyPoPSigner> = mutableListOf()
@@ -95,9 +113,15 @@ internal class SubmitRequest(
                     resume = { keyUnlockData ->
                         runBlocking {
                             submitRequest(
+                                // BEGIN EUDI-changed
+                                /*
+                                unsignedDocument
+                                offeredDocument
+                                */
                                 unsignedDocuments,
-                                keyUnlockData,
                                 offer = offer
+                                // END EUDI-changed
+                                keyUnlockData,
                             )
                         }
                     },
