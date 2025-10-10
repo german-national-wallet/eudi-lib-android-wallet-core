@@ -37,21 +37,20 @@ class OpenId4VciManagerConfigBuilderParUsageTest(
             .withParUsage(parUsage)
             .withPrivateKeySource { Crypto.createEcPrivateKey(EcCurve.P256) }
 
+        val config = builder.build()
 
-    val config = builder.build()
+        assertEquals(parUsage, config.parUsage)
+    }
 
-    assertEquals(parUsage, config.parUsage)
-}
+    companion object {
 
-companion object {
-
-    @Parameterized.Parameters(name = "{index}: parUsage={0}")
-    @JvmStatic
-    fun parUsageArgs() = arrayListOf(
-        OpenId4VciManager.Config.ParUsage.IF_SUPPORTED,
-        OpenId4VciManager.Config.ParUsage.REQUIRED,
-        OpenId4VciManager.Config.ParUsage.NEVER
-    )
-}
+        @Parameterized.Parameters(name = "{index}: parUsage={0}")
+        @JvmStatic
+        fun parUsageArgs() = arrayListOf(
+            OpenId4VciManager.Config.ParUsage.IF_SUPPORTED,
+            OpenId4VciManager.Config.ParUsage.REQUIRED,
+            OpenId4VciManager.Config.ParUsage.NEVER
+        )
+    }
 
 }

@@ -71,7 +71,7 @@ internal class DefaultOpenId4VciManager(
     var ktorHttpClientFactory: KtorHttpClientFactory? = null,
 ) : OpenId4VciManager {
 
-    private val httpClientFactory
+    internal val httpClientFactory
         get() = (ktorHttpClientFactory ?: DefaultHttpClientFactory)
             .wrappedWithLogging(logger)
             .wrappedWithContentNegotiation()
