@@ -116,6 +116,7 @@ sealed interface IssueEvent : OpenId4VciResult {
         IssueEvent,
         DocumentDetails by DocumentDetails(document)
 
+    // BEGIN EUDI-added
     /**
      * Authorization with refresh token
      * This token can or not be provided by the Issuer, if present should be stored
@@ -125,6 +126,7 @@ sealed interface IssueEvent : OpenId4VciResult {
      */
 
     data class AuthorizationWithRefreshToken(val refreshToken: RefreshToken?) : IssueEvent
+    // END EUDI-added
 
     companion object {
         internal fun failure(
