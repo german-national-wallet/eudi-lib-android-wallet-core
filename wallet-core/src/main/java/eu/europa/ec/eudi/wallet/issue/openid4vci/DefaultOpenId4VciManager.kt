@@ -73,6 +73,7 @@ internal class DefaultOpenId4VciManager(
             .wrappedWithLogging(logger)
             .wrappedWithContentNegotiation()
 
+    // EUDI-added
     private val offerCreator: OfferCreator by lazy {
         OfferCreator(config, httpClientFactory)
     }
@@ -85,10 +86,13 @@ internal class DefaultOpenId4VciManager(
     private val issuerAuthorization: IssuerAuthorization by lazy {
         IssuerAuthorization(context, logger)
     }
+
+    // BEGIN EUDI-added
     private lateinit var issuer: Issuer
     private lateinit var pkceVerifier: PKCEVerifier
     private lateinit var credentialConfigurationIdentifierList: List<CredentialConfigurationIdentifier>
     private lateinit var offer: Offer
+    // END EUDI-added
 
     override suspend fun getIssuerMetadata(): Result<CredentialIssuerMetadata> {
         return CredentialIssuerId(config.issuerUrl).mapCatching {
@@ -169,6 +173,7 @@ internal class DefaultOpenId4VciManager(
         }
     }
 
+
     override fun issueDocumentByOfferUri(
         offerUri: String,
         txCode: String?,
@@ -245,6 +250,7 @@ internal class DefaultOpenId4VciManager(
         resumeWithAuthorization(Uri.parse(uri))
     }
 
+    // BEGIN EUDI-added
     override suspend fun performPushAuthorizationRequest(
         credentialConfigurationId: String,
         attestationJWT: SignedJWT,
@@ -345,6 +351,7 @@ internal class DefaultOpenId4VciManager(
             }
         }
     }
+    // END EUDI-added
 
     /**
      * Issues the given [Offer].

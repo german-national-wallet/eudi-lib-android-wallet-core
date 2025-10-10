@@ -33,7 +33,7 @@ import eu.europa.ec.eudi.wallet.document.DocumentId
 import eu.europa.ec.eudi.wallet.document.DocumentManager
 import eu.europa.ec.eudi.wallet.internal.OpenId4VpUtils.generateMdocGeneratedNonce
 import eu.europa.ec.eudi.wallet.internal.OpenId4VpUtils.getSessionTranscriptBytes
-import eu.europa.ec.eudi.wallet.internal.OpenId4VpX509CertificateTrust
+import eu.europa.ec.eudi.wallet.internal.Openid4VpX509CertificateTrust
 
 class OpenId4VpRequestProcessor(
     private val documentManager: DocumentManager,
@@ -44,8 +44,8 @@ class OpenId4VpRequestProcessor(
         DeviceRequestProcessor.Helper(documentManager)
     }
 
-    internal val openid4VpX509CertificateTrustStore: OpenId4VpX509CertificateTrust
-            by lazy { OpenId4VpX509CertificateTrust(readerTrustStore) }
+    internal val openid4VpX509CertificateTrustStore: Openid4VpX509CertificateTrust
+            by lazy { Openid4VpX509CertificateTrust(readerTrustStore) }
 
     override fun process(request: Request): RequestProcessor.ProcessedRequest {
         require(request is OpenId4VpRequest) { "Request must be an OpenId4VpRequest" }
