@@ -116,6 +116,7 @@ sealed interface IssueEvent : OpenId4VciResult {
         IssueEvent,
         DocumentDetails by DocumentDetails(document)
 
+    // EUDI-Added: Authorization with refresh token
     /**
      * Authorization with refresh token
      * This token can or not be provided by the Issuer, if present should be stored
