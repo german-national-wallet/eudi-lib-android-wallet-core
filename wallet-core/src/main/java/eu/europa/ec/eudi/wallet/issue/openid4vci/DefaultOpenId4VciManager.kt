@@ -312,7 +312,7 @@ internal class DefaultOpenId4VciManager(
         launch(executor, onIssueEvent) { coroutineScope, listener ->
 
             try {
-                val offer = Offer(issuer.credentialOffer)
+                val offer =  Offer(issuer.credentialOffer)
                 var authorizedRequest = issuerAuthorization.authorizeWithAuthorizationCode(
                     issuer = issuer,
                     authRequest = AuthorizationRequestPrepared(
@@ -325,6 +325,8 @@ internal class DefaultOpenId4VciManager(
                     authorizationCode = authorizationCode
                 )
 
+                // EUDI-removed: listener call
+                // listener(IssueEvent.Started(offer.offeredDocuments.size))
                 val issuedDocumentIds = mutableListOf<DocumentId>()
                 val documentCreator = DocumentCreator(
                     documentManager = documentManager,
@@ -332,6 +334,14 @@ internal class DefaultOpenId4VciManager(
                     logger = logger
                 )
 
+                // BEGIN EUDI-changed: Batch issuance
+                /*
+                val requestMap = documentCreator.createDocuments(offer)
+                val request = SubmitRequest(config, issuer, authorizedRequest)
+                val response = request.request(requestMap).also {
+                    authorizedRequest = request.authorizedRequest
+                }
+                */
                 val requestMap = mutableMapOf<UnsignedDocument, Offer.OfferedDocument>()
 
                 when (val batchCredentialIssuance =
@@ -355,11 +365,13 @@ internal class DefaultOpenId4VciManager(
                         // TODO here we can get the refresh token it is inside the authorizedRequest
                         authorizedRequest = request.authorizedRequest
                     }
+                // END EUDI-changed: Batch issuance
                 ProcessResponse(
                     documentManager = documentManager,
                     deferredContextCreator = DeferredContextCreator(issuer, authorizedRequest),
                     listener = listener,
                     issuedDocumentIds = issuedDocumentIds,
+                    // EUDI-added
                     unsignedDocuments = requestMap.keys.toList(),
                     logger = logger
                 ).use { it.process(response) }
@@ -393,6 +405,8 @@ internal class DefaultOpenId4VciManager(
         val requestMap = documentCreator.createDocuments(offer)
 
         val submit = SubmitRequest(config, issuer, authorizedRequest)
+        // EUDI-changed
+        // val response = submit.request(requestMap).also {
         val response = submit.request(requestMap, offer).also {
             authorizedRequest = submit.authorizedRequest
         }
