@@ -44,6 +44,7 @@ internal class IssuerAuthorization(
 
     var continuation: CancellableContinuation<Result<Response>>? = null
 
+    // BEGIN EUDI-added
     suspend fun performPushAuthorizationRequest(issuer: Issuer): AuthorizationRequestPrepared {
         return issuer.prepareAuthorizationRequest().getOrThrow()
     }
@@ -60,6 +61,7 @@ internal class IssuerAuthorization(
             )
         }.getOrThrow()
     }
+    // END EUDI-added
 
     /**
      * Authorizes the given [Issuer] and returns the authorized request.
@@ -82,6 +84,7 @@ internal class IssuerAuthorization(
                         AuthorizationCode(authResponse.authorizationCode),
                         authResponse.serverState
                     )
+
                 }
             }.getOrThrow()
         }

@@ -36,7 +36,9 @@ import kotlin.test.assertEquals
 
 class DocumentCreatorTest {
 
+
     @Test
+    // EUDI-added: @Ignore
     @Ignore("Core will be removed")
     fun `assert continuation is not null when resume is executed from event`() = runTest {
         val docTypeMock = "docType"
