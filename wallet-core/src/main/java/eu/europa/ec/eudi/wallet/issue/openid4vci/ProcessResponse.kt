@@ -44,6 +44,7 @@ internal class ProcessResponse(
     val deferredContextCreator: DeferredContextCreator,
     val listener: OpenId4VciManager.OnResult<IssueEvent>,
     val issuedDocumentIds: MutableList<DocumentId>,
+    // EUDI-added
     val unsignedDocuments: List<UnsignedDocument> = emptyList(),
     val logger: Logger? = null,
 ) : Closeable {

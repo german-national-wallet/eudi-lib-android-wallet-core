@@ -44,16 +44,24 @@ fun OfferedDocument.extractDocumentMetaData(): DocumentMetaData {
             DocumentMetaData.IssuerDisplay(
                 name = it.name ?: "",
                 locale = Locale(it.locale ?: ""),
+                // EUDI-changed
+                // logo = it.logo?.toDocumentLogo()
                 logo = null
             )
         }
     )
 }
 
+private fun CredentialIssuerMetadata.Display.Logo?.toDocumentLogo(): DocumentMetaData.Logo? {
+    if (this?.uri == null && this?.alternativeText == null) return null
+
+    return DocumentMetaData.Logo(uri, alternativeText)
+}
+
 private fun Display.toDocumentDisplay(): DocumentMetaData.Display = DocumentMetaData.Display(
     name = name,
     locale = locale,
-    logo = null,
+    logo = logo?.toDocumentLogo(),
     description = description,
     backgroundColor = backgroundColor,
     textColor = textColor
