@@ -16,95 +16,99 @@
 
 package eu.europa.ec.eudi.wallet.issue.openid4vci
 
-//import androidx.biometric.BiometricPrompt.CryptoObject
-//import eu.europa.ec.eudi.openid4vci.CredentialConfiguration
-//import eu.europa.ec.eudi.openid4vci.PopSigner
-//import eu.europa.ec.eudi.wallet.document.Algorithm
-//import eu.europa.ec.eudi.wallet.document.SignedWithAuthKeyResult
-//import eu.europa.ec.eudi.wallet.document.UnsignedDocument
-//
-///**
-// * Abstract class for signing proofs.
-// *
-// * @property popSigner The signer for the proof of possession as required by the vci library.
-// * @property userAuthStatus The status of the user authentication.
-// */
-//internal abstract class ProofSigner {
-//    abstract val popSigner: PopSigner
-//    var userAuthStatus: UserAuthStatus = UserAuthStatus.NotRequired
-//        protected set
-//
-//    /**
-//     * Signs the signing input with the authentication key from issuance request for the given algorithm.
-//     * @param document the document which will sign the proof
-//     * @param signingInput The input to sign.
-//     * @param algorithm The algorithm to use for signing.
-//     * @throws IllegalStateException If user authentication is required.
-//     * @throws Throwable If an error occurs during signing.
-//     * @return The signature of the signing input.
-//     */
-//    fun doSign(
-//        document: UnsignedDocument,
-//        signingInput: ByteArray,
-//        @Algorithm algorithm: String
-//    ): ByteArray {
-//        userAuthStatus = UserAuthStatus.NotRequired
-//        return document.signWithAuthKey(signingInput, algorithm).let { signResult ->
-//            when (signResult) {
-//                is SignedWithAuthKeyResult.Success -> signResult.signature
-//                is SignedWithAuthKeyResult.Failure -> throw signResult.throwable
-//                is SignedWithAuthKeyResult.UserAuthRequired -> {
-//                    userAuthStatus = UserAuthStatus.Required(signResult.cryptoObject)
-//                    throw IllegalStateException("User authentication required")
-//                }
-//            }
-//        }
-//    }
-//
-//    /**
-//     * Companion object for the ProofSigner class.
-//     */
-//    companion object {
-//
-//        /**
-//         * Creates a proof signer for the given issuance request and credential configuration.
-//         * @param issuanceRequest The issuance request.
-//         * @param credentialConfiguration The credential configuration.
-//         * @param supportedProofTypesPrioritized The supported proof types prioritized.
-//         * @return The proof signer or a failure if the proof type is not supported.
-//         */
-//        @JvmStatic
-//        operator fun invoke(
-//            issuanceRequest: UnsignedDocument,
-//            credentialConfiguration: CredentialConfiguration,
-//            supportedProofTypesPrioritized: List<OpenId4VciManager.Config.ProofType>? = null,
-//        ): Result<ProofSigner> {
-//            return try {
-//                Result.success(
-//                    SupportedProofType
-//                        .apply { supportedProofTypesPrioritized?.let { withPriority(it) } }
-//                        .select(credentialConfiguration)
-//                        .createProofSigner(issuanceRequest)
-//                )
-//            } catch (e: Throwable) {
-//                Result.failure(e)
-//            }
-//        }
-//    }
-//
-//    /**
-//     * Sealed interface for the user authentication status.
-//     */
-//    sealed interface UserAuthStatus {
-//        /**
-//         * User authentication is not required.
-//         */
-//        object NotRequired : UserAuthStatus
-//
-//        /**
-//         * User authentication is required.
-//         * @property cryptoObject The crypto object to use for authentication.
-//         */
-//        data class Required(val cryptoObject: CryptoObject? = null) : UserAuthStatus
-//    }
-//}
+import androidx.biometric.BiometricPrompt.CryptoObject
+import eu.europa.ec.eudi.openid4vci.CredentialConfiguration
+import eu.europa.ec.eudi.openid4vci.PopSigner
+import eu.europa.ec.eudi.wallet.document.Algorithm
+import eu.europa.ec.eudi.wallet.document.SignedWithAuthKeyResult
+import eu.europa.ec.eudi.wallet.document.UnsignedDocument
+
+/**
+ * Abstract class for signing proofs.
+ *
+ * @property popSigner The signer for the proof of possession as required by the vci library.
+ * @property userAuthStatus The status of the user authentication.
+ */
+// BEGIN EUDI-removed
+/*
+internal abstract class ProofSigner {
+    abstract val popSigner: PopSigner
+    var userAuthStatus: UserAuthStatus = UserAuthStatus.NotRequired
+        protected set
+
+    /.**
+     * Signs the signing input with the authentication key from issuance request for the given algorithm.
+     * @param document the document which will sign the proof
+     * @param signingInput The input to sign.
+     * @param algorithm The algorithm to use for signing.
+     * @throws IllegalStateException If user authentication is required.
+     * @throws Throwable If an error occurs during signing.
+     * @return The signature of the signing input.
+     */
+    fun doSign(
+        document: UnsignedDocument,
+        signingInput: ByteArray,
+        @Algorithm algorithm: String
+    ): ByteArray {
+        userAuthStatus = UserAuthStatus.NotRequired
+        return document.signWithAuthKey(signingInput, algorithm).let { signResult ->
+            when (signResult) {
+                is SignedWithAuthKeyResult.Success -> signResult.signature
+                is SignedWithAuthKeyResult.Failure -> throw signResult.throwable
+                is SignedWithAuthKeyResult.UserAuthRequired -> {
+                    userAuthStatus = UserAuthStatus.Required(signResult.cryptoObject)
+                    throw IllegalStateException("User authentication required")
+                }
+            }
+        }
+    }
+
+    /.**
+     * Companion object for the ProofSigner class.
+     */
+    companion object {
+
+        /.**
+         * Creates a proof signer for the given issuance request and credential configuration.
+         * @param issuanceRequest The issuance request.
+         * @param credentialConfiguration The credential configuration.
+         * @param supportedProofTypesPrioritized The supported proof types prioritized.
+         * @return The proof signer or a failure if the proof type is not supported.
+         */
+        @JvmStatic
+        operator fun invoke(
+            issuanceRequest: UnsignedDocument,
+            credentialConfiguration: CredentialConfiguration,
+            supportedProofTypesPrioritized: List<OpenId4VciManager.Config.ProofType>? = null,
+        ): Result<ProofSigner> {
+            return try {
+                Result.success(
+                    SupportedProofType
+                        .apply { supportedProofTypesPrioritized?.let { withPriority(it) } }
+                        .select(credentialConfiguration)
+                        .createProofSigner(issuanceRequest)
+                )
+            } catch (e: Throwable) {
+                Result.failure(e)
+            }
+        }
+    }
+
+    /.**
+     * Sealed interface for the user authentication status.
+     */
+    sealed interface UserAuthStatus {
+        /.**
+         * User authentication is not required.
+         */
+        object NotRequired : UserAuthStatus
+
+        /.**
+         * User authentication is required.
+         * @property cryptoObject The crypto object to use for authentication.
+         */
+        data class Required(val cryptoObject: CryptoObject? = null) : UserAuthStatus
+    }
+}
+*/
+// END EUDI-removed

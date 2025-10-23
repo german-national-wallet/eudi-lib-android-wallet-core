@@ -36,41 +36,45 @@ import eu.europa.ec.eudi.wallet.document.UnsignedDocument
  * @param supportedProofAlgorithm The supported proof algorithm.
  *
  */
-//internal class JWSProofSigner(
-//    private val document: UnsignedDocument,
-//    private val supportedProofAlgorithm: SupportedProofType.ProofAlgorithm.Jws
-//) : ProofSigner(), JWSSigner {
-//
-//    private val jcaContext = JCAContext()
-//
-//    /**
-//     * The JWK of the public key.
-//     */
-//    private val jwk = JWK.parseFromPEMEncodedObjects(document.publicKey.pem)
-//
-//    override val popSigner: PopSigner.Jwt = PopSigner.Jwt(
-//        algorithm = supportedProofAlgorithm.algorithm,
-//        bindingKey = JwtBindingKey.Jwk(jwk),
-//        jwsSigner = this
-//    )
-//
-//    override fun getJCAContext(): JCAContext = jcaContext
-//
-//    override fun supportedJWSAlgorithms(): MutableSet<JWSAlgorithm> {
-//        return mutableSetOf(supportedProofAlgorithm.algorithm)
-//    }
-//
-//    override fun sign(header: JWSHeader, signingInput: ByteArray): Base64URL {
-//        if (header.algorithm != supportedProofAlgorithm.algorithm) {
-//            throw JOSEException(
-//                AlgorithmSupportMessage.unsupportedJWSAlgorithm(
-//                    header.algorithm,
-//                    supportedJWSAlgorithms()
-//                )
-//            )
-//        }
-//        return doSign(document, signingInput, supportedProofAlgorithm.signAlgorithmName).let { signature ->
-//            Base64URL.encode(signature.derToConcat(supportedProofAlgorithm))
-//        }
-//    }
-//}
+// BEGIN EUDI-removed
+/*
+internal class JWSProofSigner(
+    private val document: UnsignedDocument,
+    private val supportedProofAlgorithm: SupportedProofType.ProofAlgorithm.Jws
+) : ProofSigner(), JWSSigner {
+
+    private val jcaContext = JCAContext()
+
+    /.**
+     * The JWK of the public key.
+     */
+    private val jwk = JWK.parseFromPEMEncodedObjects(document.publicKey.pem)
+
+    override val popSigner: PopSigner.Jwt = PopSigner.Jwt(
+        algorithm = supportedProofAlgorithm.algorithm,
+        bindingKey = JwtBindingKey.Jwk(jwk),
+        jwsSigner = this
+    )
+
+    override fun getJCAContext(): JCAContext = jcaContext
+
+    override fun supportedJWSAlgorithms(): MutableSet<JWSAlgorithm> {
+        return mutableSetOf(supportedProofAlgorithm.algorithm)
+    }
+
+    override fun sign(header: JWSHeader, signingInput: ByteArray): Base64URL {
+        if (header.algorithm != supportedProofAlgorithm.algorithm) {
+            throw JOSEException(
+                AlgorithmSupportMessage.unsupportedJWSAlgorithm(
+                    header.algorithm,
+                    supportedJWSAlgorithms()
+                )
+            )
+        }
+        return doSign(document, signingInput, supportedProofAlgorithm.signAlgorithmName).let { signature ->
+            Base64URL.encode(signature.derToConcat(supportedProofAlgorithm))
+        }
+    }
+}
+*/
+// END EUDI-removed

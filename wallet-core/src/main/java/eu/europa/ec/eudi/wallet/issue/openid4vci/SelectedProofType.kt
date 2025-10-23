@@ -22,25 +22,29 @@ import eu.europa.ec.eudi.wallet.document.UnsignedDocument
  * Selected proof type. It is used to create a proof signer.
  * @property algorithm the proof algorithm
  */
-//internal sealed interface SelectedProofType {
-//    val algorithm: SupportedProofType.ProofAlgorithm
-//
-//    /**
-//     * Creates a proof signer.
-//     * @param document the document which will sign the proof
-//     * @return the proof signer
-//     */
-//    fun createProofSigner(document: UnsignedDocument): ProofSigner
-//
-//    /**
-//     * Proof type using JWT.
-//     * @property algorithm the proof algorithm
-//     * @constructor Creates a new [Jwt] instance.
-//     * @param algorithm the proof algorithm
-//     */
-//    data class Jwt(override val algorithm: SupportedProofType.ProofAlgorithm.Jws) : SelectedProofType {
-//        override fun createProofSigner(document: UnsignedDocument): ProofSigner {
-//            return JWSProofSigner(document, algorithm)
-//        }
-//    }
-//}
+// BEGIN EUDI-removed
+/*
+internal sealed interface SelectedProofType {
+    val algorithm: SupportedProofType.ProofAlgorithm
+
+    /.**
+     * Creates a proof signer.
+     * @param document the document which will sign the proof
+     * @return the proof signer
+     */
+    fun createProofSigner(document: UnsignedDocument): ProofSigner
+
+    /.**
+     * Proof type using JWT.
+     * @property algorithm the proof algorithm
+     * @constructor Creates a new [Jwt] instance.
+     * @param algorithm the proof algorithm
+     */
+    data class Jwt(override val algorithm: SupportedProofType.ProofAlgorithm.Jws) : SelectedProofType {
+        override fun createProofSigner(document: UnsignedDocument): ProofSigner {
+            return JWSProofSigner(document, algorithm)
+        }
+    }
+}
+/*
+// END EUDI-removed

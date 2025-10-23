@@ -57,6 +57,8 @@ internal class IssuerCreator(
         return Issuer.make(config.toOpenId4VCIConfig(), credentialOffer, ktorHttpClientFactory)
             .getOrThrow()
     }
+
+    // BEGIN EUDI-added
     /**
      * Creates an [Issuer] from the given [Offer].
      * @param offer The [Offer].
@@ -84,6 +86,7 @@ internal class IssuerCreator(
         )
             .getOrThrow()
     }
+    // END EUDI-added
     /**
      * Creates an [Issuer] from the given [CredentialConfigurationIdentifier]s.
      * @param credentialConfigurationIdentifiers The [CredentialConfigurationIdentifier]s.
@@ -110,7 +113,7 @@ internal class IssuerCreator(
                     Issuer.metaData(client, createIssuerId)
                 }
             }
-            // TODO review this logic to issuance
+            // EUDI-note: TODO review this logic to issuance
             .mapCatching { (issuerMetadata, _) ->
                 val configurationId = issuerMetadata
                     .credentialConfigurationsSupported
@@ -144,6 +147,7 @@ internal class IssuerCreator(
         )
     }
 
+    // BEGIN EUDI-added
     private fun OpenId4VciManager.Config.toOpenId4VCIConfigWithAttestation(
         attestationJWT: SignedJWT,
         jwsAlgorithm: JWSAlgorithm,
@@ -173,4 +177,5 @@ internal class IssuerCreator(
             }
         )
     }
+    // END EUDI-added
 }
