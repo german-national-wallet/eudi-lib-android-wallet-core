@@ -20,6 +20,6 @@ plugins {
     alias(libs.plugins.kotlin.android) apply false
     alias(libs.plugins.dokka) apply false
     alias(libs.plugins.dependency.license.report) apply false
-    alias(libs.plugins.dependencycheck) apply false
+//    alias(libs.plugins.dependencycheck) apply false
     alias(libs.plugins.jetbrains.kotlin.jvm) apply false
 }
