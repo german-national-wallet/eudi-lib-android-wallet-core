@@ -15,7 +15,7 @@
  */
 
 package eu.europa.ec.eudi.wallet.issue.openid4vci
-
+/*
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerId
 import eu.europa.ec.eudi.openid4vci.CredentialOffer
 import eu.europa.ec.eudi.openid4vci.Issuer
@@ -54,3 +54,4 @@ internal class OfferCreator(
         }
     }
 }
+ */

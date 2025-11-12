@@ -83,9 +83,11 @@ internal class DefaultOpenId4VciManager(
             .wrappedWithContentNegotiation()
 
     // EUDI-added
+    /*
     private val offerCreator: OfferCreator by lazy {
         OfferCreator(config, httpClientFactory)
     }
+     */
     private val offerResolver: OfferResolver by lazy {
         OfferResolver(httpClientFactory)
     }
@@ -269,6 +271,7 @@ internal class DefaultOpenId4VciManager(
         resumeWithAuthorization(uri.toUri())
     }
 
+    /*
     // BEGIN EUDI-added
     override suspend fun performPushAuthorizationRequest(
         credentialConfigurationId: String,
@@ -402,7 +405,30 @@ internal class DefaultOpenId4VciManager(
             }
         }
     }
+
+    override suspend fun issueDocumentWithRefreshToken(
+        refreshToken: String,
+        credentialType: String,
+        executor: Executor?,
+        issuerCreator.createIssuer(listOf(CredentialConfigurationIdentifier(credentialType)))
+
+    val authorizedRequest = issuer.issueWithRefreshToken(refreshToken).getOrThrow()
+    processDocumentIssuance(authorizedRequest,
+    onIssueEvent: OpenId4VciManager.OnIssueEvent
+    ) = launch(executor, onIssueEvent) { _, listener ->
+        try {
+            offer = Offer(issuer.credentialOffer)
+            issuer =offer, listener)
+
+        } catch (e: Throwable) {
+            logger?.d(
+                DefaultOpenId4VciManager::class.java.simpleName,
+                "Issue document with refresh token failed:$e"
+            )
+        }
+    }
     // END EUDI-added
+    */
 
     /**
      * Issues the given [Offer].
