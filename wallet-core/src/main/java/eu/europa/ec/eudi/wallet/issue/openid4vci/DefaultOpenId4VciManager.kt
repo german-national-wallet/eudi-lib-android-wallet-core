@@ -34,6 +34,7 @@ import eu.europa.ec.eudi.openid4vci.HttpsUrl
 import eu.europa.ec.eudi.openid4vci.Issuer
 import eu.europa.ec.eudi.openid4vci.IssuerMetadataPolicy
 import eu.europa.ec.eudi.openid4vci.KtorHttpClientFactory
+import eu.europa.ec.eudi.openid4vci.Nonce
 import eu.europa.ec.eudi.openid4vci.PKCEVerifier
 import eu.europa.ec.eudi.wallet.document.DeferredDocument
 import eu.europa.ec.eudi.wallet.document.DocumentId
@@ -78,9 +79,11 @@ internal class DefaultOpenId4VciManager(
             .wrappedWithContentNegotiation()
 
     // EUDI-added
+    /*
     private val offerCreator: OfferCreator by lazy {
         OfferCreator(config, httpClientFactory)
     }
+     */
     private val offerResolver: OfferResolver by lazy {
         OfferResolver(httpClientFactory)
     }
@@ -262,6 +265,7 @@ internal class DefaultOpenId4VciManager(
         resumeWithAuthorization(Uri.parse(uri))
     }
 
+    /*
     // BEGIN EUDI-added
     override suspend fun performPushAuthorizationRequest(
         credentialConfigurationId: String,
@@ -381,15 +385,15 @@ internal class DefaultOpenId4VciManager(
         refreshToken: String,
         credentialType: String,
         executor: Executor?,
-        onIssueEvent: OpenId4VciManager.OnIssueEvent
+        issuerCreator.createIssuer(listOf(CredentialConfigurationIdentifier(credentialType)))
+
+    val authorizedRequest = issuer.issueWithRefreshToken(refreshToken).getOrThrow()
+    processDocumentIssuance(authorizedRequest,
+    onIssueEvent: OpenId4VciManager.OnIssueEvent
     ) = launch(executor, onIssueEvent) { _, listener ->
         try {
             offer = Offer(issuer.credentialOffer)
-            issuer =
-                issuerCreator.createIssuer(listOf(CredentialConfigurationIdentifier(credentialType)))
-
-            val authorizedRequest = issuer.issueWithRefreshToken(refreshToken).getOrThrow()
-            processDocumentIssuance(authorizedRequest, offer, listener)
+            issuer =offer, listener)
 
         } catch (e: Throwable) {
             logger?.d(
@@ -399,6 +403,7 @@ internal class DefaultOpenId4VciManager(
         }
     }
     // END EUDI-added
+    */
 
 
     /**
@@ -421,9 +426,7 @@ internal class DefaultOpenId4VciManager(
         val requestMap = documentCreator.createDocuments(offer)
 
         val submit = SubmitRequest(config, issuer, authorizedRequest)
-        // EUDI-changed
-        // val response = submit.request(requestMap).also {
-        val response = submit.request(requestMap, offer).also {
+        val response = submit.request(requestMap).also {
             authorizedRequest = submit.authorizedRequest
         }
         ProcessResponse(

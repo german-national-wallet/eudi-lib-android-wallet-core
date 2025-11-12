@@ -400,6 +400,7 @@ interface OpenId4VciManager {
         }
     }
 
+    /*
     suspend fun performPushAuthorizationRequest(
         credentialConfigurationId: String,
         attestationJWT: SignedJWT,
@@ -426,4 +427,5 @@ interface OpenId4VciManager {
         executor: Executor? = null,
         onIssueEvent: OnIssueEvent,
     )
+    */
 }
