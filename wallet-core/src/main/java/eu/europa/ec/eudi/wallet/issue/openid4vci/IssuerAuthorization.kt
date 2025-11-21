@@ -18,6 +18,7 @@ package eu.europa.ec.eudi.wallet.issue.openid4vci
 
 import android.net.Uri
 import eu.europa.ec.eudi.openid4vci.AuthorizationCode
+import eu.europa.ec.eudi.openid4vci.AuthorizationRequestPrepared
 import eu.europa.ec.eudi.openid4vci.AuthorizedRequest
 import eu.europa.ec.eudi.openid4vci.Issuer
 import eu.europa.ec.eudi.wallet.internal.d
