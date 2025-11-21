@@ -15,7 +15,7 @@
  */
 package eu.europa.ec.eudi.wallet.issue.openid4vci
 
-import eu.europa.ec.eudi.openid4vci.CNonce
+import eu.europa.ec.eudi.openid4vci.Nonce
 import eu.europa.ec.eudi.openid4vci.RefreshToken
 import eu.europa.ec.eudi.wallet.document.CreateDocumentSettings
 import eu.europa.ec.eudi.wallet.document.DeferredDocument
@@ -133,7 +133,7 @@ sealed interface IssueEvent : OpenId4VciResult {
     /**
      * Passing back the c_nonce to be sign to the RWSCD
      */
-    data class CNonceAvailable(val cNonce: CNonce) : IssueEvent
+    data class CNonceAvailable(val cNonce: Nonce) : IssueEvent
     // END EUDI-added
 
     companion object {

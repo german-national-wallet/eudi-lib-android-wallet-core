@@ -17,14 +17,9 @@
 package eu.europa.ec.eudi.wallet.issue.openid4vci
 
 import android.content.Context
-import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.JWSSigner
 import com.nimbusds.jose.jwk.Curve
-import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.CIAuthorizationServerMetadata
 import eu.europa.ec.eudi.openid4vci.ClientAuthentication
-import eu.europa.ec.eudi.openid4vci.ClientAttestationJWT
-import eu.europa.ec.eudi.openid4vci.ClientAttestationPoPJWTSpec
 import eu.europa.ec.eudi.openid4vci.CredentialConfigurationIdentifier
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerId
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadata
@@ -50,7 +45,6 @@ import eu.europa.ec.eudi.wallet.provider.WalletKeyManager
 import io.ktor.client.HttpClient
 import org.multipaz.crypto.Algorithm
 import java.net.URI
-import kotlin.time.Duration.Companion.minutes
 
 /**
  * Creates an [Issuer] from the given [Offer].
@@ -80,6 +74,7 @@ internal class IssuerCreator(
      * @param offer The [Offer].
      * @return The [Issuer].
      */
+    /*
     fun createIssuerWithAttestation(
         offer: Offer,
         attestationJWT: SignedJWT,
@@ -102,6 +97,7 @@ internal class IssuerCreator(
         )
             .getOrThrow()
     }
+     */
     // END EUDI-added
 
     /**
@@ -313,6 +309,7 @@ internal class IssuerCreator(
     }
 
     // BEGIN EUDI-added
+    /*
     private fun OpenId4VciManager.Config.toOpenId4VCIConfigWithAttestation(
         attestationJWT: SignedJWT,
         jwsAlgorithm: JWSAlgorithm,
@@ -342,5 +339,6 @@ internal class IssuerCreator(
             }
         )
     }
+     */
     // END EUDI-added
 }
