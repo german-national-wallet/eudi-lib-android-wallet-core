@@ -230,7 +230,7 @@ internal class IssuerCreator(
         attestationJWT: String,
     ): OpenId4VCIConfig {
 
-        val signer = DPoPSigner(algorithm = Algorithm.SHA256, logger = logger).getOrThrow()
+        val signer = DPoPSigner(algorithm = Algorithm.ESP256, logger = logger).getOrThrow()
         val clientAttestationJWT = ClientAttestationJWT(SignedJWT.parse(attestationJWT))
 
         val poPJWTSpec = ClientAttestationPoPJWTSpec(
