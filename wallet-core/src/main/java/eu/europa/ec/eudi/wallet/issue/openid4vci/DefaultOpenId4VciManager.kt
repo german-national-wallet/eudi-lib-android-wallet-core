@@ -19,6 +19,7 @@ package eu.europa.ec.eudi.wallet.issue.openid4vci
 import android.content.Context
 import android.net.Uri
 import androidx.core.net.toUri
+import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.CredentialConfigurationIdentifier
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerId
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadata
@@ -124,6 +125,29 @@ internal class DefaultOpenId4VciManager(
                 val issuer = issuerCreator.createIssuer(
                     config.issuerUrl,
                     CredentialConfigurationIdentifier(credentialConfigurationId)
+                )
+                doIssue(issuer, Offer(issuer.credentialOffer), txCode, listener)
+            } catch (e: Throwable) {
+                listener(failure(e))
+                coroutineScope.cancel("issueDocumentByConfigurationIdentifier failed", e)
+            }
+        }
+    }
+
+    override fun issueDocumentByConfigurationIdentifierAttested(
+        credentialConfigurationId: String,
+        walletAttestation: String,
+        txCode: String?,
+        executor: Executor?,
+        onIssueEvent: OpenId4VciManager.OnIssueEvent,
+    ) {
+        launch(executor, onIssueEvent) { coroutineScope, listener ->
+            try {
+                val issuer = issuerCreator.createIssuerWithAttestation(
+                    attestationJWT = walletAttestation,
+                    credentialConfigurationIdentifiers = listOf(
+                        CredentialConfigurationIdentifier(credentialConfigurationId)
+                    )
                 )
                 doIssue(issuer, Offer(issuer.credentialOffer), txCode, listener)
             } catch (e: Throwable) {
