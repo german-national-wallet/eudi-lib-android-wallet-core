@@ -157,7 +157,7 @@ dependencies {
     implementation(libs.androidx.appcompat)
     // OpenID4VCI
     // EUID-added
-    api(libs.eudi.lib.jvm.openid4vci.kt)
+    api(project(LibraryModule.Openid4vci.path))
     implementation(libs.nimbus.oauth2.oidc.sdk)
     // Siop-Openid4VP library
     implementation(libs.eudi.lib.jvm.siop.openid4vp.kt) {
