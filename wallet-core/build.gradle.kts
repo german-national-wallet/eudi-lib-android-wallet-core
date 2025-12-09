@@ -153,7 +153,7 @@ dependencies {
     api(libs.eudi.iso18013.data.transfer)
     // OpenID4VCI
     // EUID-added
-    api(libs.eudi.lib.jvm.openid4vci.kt.upstream)
+    api(project(LibraryModule.Openid4vci.path))
     // multipaz library
     api(libs.multipaz.android) {
         exclude(group = "org.bouncycastle")
