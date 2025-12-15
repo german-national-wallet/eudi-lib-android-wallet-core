@@ -19,6 +19,7 @@ package eu.europa.ec.eudi.wallet.issue.openid4vci
 import android.content.Context
 import android.net.Uri
 import androidx.core.net.toUri
+import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.CredentialConfigurationIdentifier
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerId
@@ -28,6 +29,9 @@ import eu.europa.ec.eudi.openid4vci.DeferredIssuer
 import eu.europa.ec.eudi.openid4vci.Issuer
 import eu.europa.ec.eudi.openid4vci.IssuerMetadataPolicy
 import eu.europa.ec.eudi.openid4vci.PKCEVerifier
+import eu.europa.ec.eudi.openid4vci.SignFunction
+import eu.europa.ec.eudi.openid4vci.SignOperation
+import eu.europa.ec.eudi.openid4vci.Signer
 import eu.europa.ec.eudi.wallet.document.DeferredDocument
 import eu.europa.ec.eudi.wallet.document.DocumentId
 import eu.europa.ec.eudi.wallet.document.DocumentManager
@@ -47,7 +51,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import java.security.PrivateKey
+import java.security.SecureRandom
+import java.security.Signature
 import java.util.concurrent.Executor
 
 /**
@@ -134,17 +142,79 @@ internal class DefaultOpenId4VciManager(
         }
     }
 
+    // BEGIN EUDI-added: Copied from SigningOps.kt with minor adjustments
+    fun signFunctionForJavaPrivateKey(
+        javaSigningAlgorithm: String,
+        privateKey: PrivateKey,
+        secureRandom: SecureRandom?,
+        provider: String?,
+    ): SignFunction =
+        SignFunction { input ->
+            withContext(Dispatchers.IO) {
+                val signature =
+                    provider
+                        ?.let { Signature.getInstance(javaSigningAlgorithm, it) }
+                        ?: Signature.getInstance(javaSigningAlgorithm)
+                signature.run {
+                    secureRandom
+                        ?.let { initSign(privateKey, it) }
+                        ?: initSign(privateKey)
+
+                    update(input)
+
+                    sign()
+                }
+            }
+        }
+
+    private fun <PUB> signerFromPrivateKey(
+        signingAlgorithm: String,
+        privateKey: PrivateKey,
+        publicMaterial: PUB,
+        secureRandom: SecureRandom?,
+        provider: String?,
+    ): Signer<PUB> = object : Signer<PUB> {
+
+        override val javaAlgorithm: String
+            get() = signingAlgorithm
+
+        override suspend fun acquire(): SignOperation<PUB> {
+            val sign = signFunctionForJavaPrivateKey(signingAlgorithm, privateKey, secureRandom, provider)
+            return SignOperation(sign, publicMaterial)
+        }
+
+        override suspend fun release(signOperation: SignOperation<PUB>?) {
+            // Nothing to do for releasing
+        }
+    }
+    // END EUDI-added: Copied from SigningOps.kt with minor adjustments
+
     override fun issueDocumentByConfigurationIdentifierAttested(
         credentialConfigurationId: String,
-        walletAttestation: String,
+        walletAttestation: SignedJWT,
+        walletWiaPopPublicKey: JWK,
+        walletWiaPopPrivateKey: PrivateKey,
         txCode: String?,
         executor: Executor?,
         onIssueEvent: OpenId4VciManager.OnIssueEvent,
     ) {
         launch(executor, onIssueEvent) { coroutineScope, listener ->
             try {
+                val walletWiaPopSigner = signerFromPrivateKey(
+                    // TODO: Derive this from the key (algorithm "EC", curve "secp256r1")
+                    // somehow. VCI library's SigningOps has a Curve.toJavaSigningAlg() extension
+                    // for nimbus curves, mapping P_256 -> SHA256withECDSA. For now I'm hard
+                    // coding this. walletWiaPopPrivateKey.algorithm is "EC".
+                    signingAlgorithm = "SHA256withECDSA",
+                    privateKey = walletWiaPopPrivateKey,
+                    publicMaterial = walletWiaPopPublicKey,
+                    secureRandom = null,
+                    provider = null,
+                )
+
                 val issuer = issuerCreator.createIssuerWithAttestation(
                     attestationJWT = walletAttestation,
+                    walletWiaPopSigner = walletWiaPopSigner,
                     credentialConfigurationIdentifiers = listOf(
                         CredentialConfigurationIdentifier(credentialConfigurationId)
                     )
