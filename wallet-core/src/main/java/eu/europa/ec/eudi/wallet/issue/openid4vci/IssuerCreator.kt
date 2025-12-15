@@ -18,8 +18,13 @@ package eu.europa.ec.eudi.wallet.issue.openid4vci
 
 import android.content.Context
 import com.nimbusds.jose.jwk.Curve
+import com.nimbusds.jose.jwk.JWK
+import com.nimbusds.jwt.SignedJWT
+import eu.europa.ec.eudi.openid4vci.AuthorizeIssuanceConfig
 import eu.europa.ec.eudi.openid4vci.CIAuthorizationServerMetadata
 import eu.europa.ec.eudi.openid4vci.ClientAuthentication
+import eu.europa.ec.eudi.openid4vci.ClientAttestationJWT
+import eu.europa.ec.eudi.openid4vci.ClientAttestationPoPJWTSpec
 import eu.europa.ec.eudi.openid4vci.CredentialConfigurationIdentifier
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerId
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadata
@@ -32,6 +37,7 @@ import eu.europa.ec.eudi.openid4vci.IssuerMetadataPolicy
 import eu.europa.ec.eudi.openid4vci.OpenId4VCIConfig
 import eu.europa.ec.eudi.openid4vci.ParUsage
 import eu.europa.ec.eudi.openid4vci.RsaConfig
+import eu.europa.ec.eudi.openid4vci.Signer
 import eu.europa.ec.eudi.openid4vci.clientAttestationPOPJWSAlgs
 import eu.europa.ec.eudi.wallet.document.format.DocumentFormat
 import eu.europa.ec.eudi.wallet.document.format.MsoMdocFormat
@@ -47,6 +53,7 @@ import eu.europa.ec.eudi.wallet.provider.WalletKeyManager
 import io.ktor.client.HttpClient
 import org.multipaz.crypto.Algorithm
 import java.net.URI
+import java.time.Clock
 
 /**
  * Creates an [Issuer] from the given [Offer].
@@ -76,6 +83,26 @@ internal class IssuerCreator(
      */
     suspend fun createIssuer(offer: Offer): Issuer = doCreateIssuer(offer.credentialOffer)
 
+    suspend fun createIssuerWithAttestation(
+        attestationJWT: SignedJWT,
+        walletWiaPopSigner: Signer<JWK>,
+        credentialConfigurationIdentifiers: List<CredentialConfigurationIdentifier>,
+    ): Issuer {
+        val authorizationServerMetadata = CredentialIssuerId(config.issuerUrl)
+            .map { getIssuerMetadata(it).second.first() }
+            .getOrThrow()
+
+        return Issuer.makeWalletInitiated(
+            config = config.toOpenId4VCIConfigWithAttestation(
+                authorizationServerMetadata,
+                attestationJWT,
+                walletWiaPopSigner
+            ),
+            credentialIssuerId = CredentialIssuerId(config.issuerUrl).getOrThrow(),
+            credentialConfigurationIdentifiers = credentialConfigurationIdentifiers,
+            httpClient = ktorHttpClientFactory()
+        ).getOrThrow()
+    }
     /**
      * Creates an [Issuer] from the given [CredentialConfigurationIdentifier]s.
      * @param issuerUrl The issuer URL.
