@@ -18,6 +18,7 @@ package eu.europa.ec.eudi.wallet.issue.openid4vci
 
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.Curve
+import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.AuthorizeIssuanceConfig
 import eu.europa.ec.eudi.openid4vci.CIAuthorizationServerMetadata
@@ -35,6 +36,7 @@ import eu.europa.ec.eudi.openid4vci.IssuerMetadataPolicy
 import eu.europa.ec.eudi.openid4vci.OpenId4VCIConfig
 import eu.europa.ec.eudi.openid4vci.ParUsage
 import eu.europa.ec.eudi.openid4vci.RsaConfig
+import eu.europa.ec.eudi.openid4vci.Signer
 import eu.europa.ec.eudi.wallet.document.format.DocumentFormat
 import eu.europa.ec.eudi.wallet.document.format.MsoMdocFormat
 import eu.europa.ec.eudi.wallet.document.format.SdJwtVcFormat
@@ -44,6 +46,7 @@ import eu.europa.ec.eudi.wallet.logging.Logger
 import io.ktor.client.HttpClient
 import org.multipaz.crypto.Algorithm
 import java.net.URI
+import java.security.PrivateKey
 import java.time.Clock
 
 /**
@@ -80,11 +83,12 @@ internal class IssuerCreator(
      * @return The [Issuer].
      */
     suspend fun createIssuerWithAttestation(
-        attestationJWT: String,
+        attestationJWT: SignedJWT,
+        walletWiaPopSigner: Signer<JWK>,
         credentialConfigurationIdentifiers: List<CredentialConfigurationIdentifier>,
     ): Issuer {
         return Issuer.makeWalletInitiated(
-            config = config.toOpenId4VCIConfigWithAttestation(attestationJWT),
+            config = config.toOpenId4VCIConfigWithAttestation(attestationJWT, walletWiaPopSigner),
             credentialIssuerId = CredentialIssuerId(config.issuerUrl).getOrThrow(),
             credentialConfigurationIdentifiers = credentialConfigurationIdentifiers,
             httpClient = ktorHttpClientFactory()
@@ -227,14 +231,15 @@ internal class IssuerCreator(
 
     // BEGIN EUDI-added
     private fun OpenId4VciManager.Config.toOpenId4VCIConfigWithAttestation(
-        attestationJWT: String,
+        attestationJWT: SignedJWT,
+        walletWiaPopSigner: Signer<JWK>,
     ): OpenId4VCIConfig {
 
         val signer = DPoPSigner(algorithm = Algorithm.ESP256, logger = logger).getOrThrow()
-        val clientAttestationJWT = ClientAttestationJWT(SignedJWT.parse(attestationJWT))
+        val clientAttestationJWT = ClientAttestationJWT(attestationJWT)
 
         val poPJWTSpec = ClientAttestationPoPJWTSpec(
-            signer = signer
+            signer = walletWiaPopSigner
         )
 
         return OpenId4VCIConfig(
