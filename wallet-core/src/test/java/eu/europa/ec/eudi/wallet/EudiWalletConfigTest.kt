@@ -53,7 +53,6 @@ class EudiWalletConfigTest {
                 withIssuerUrl("https://example.com")
                 withClientId("client-id")
                 withAuthFlowRedirectionURI("eudi-openid4ci://authorize")
-                withPrivateKeySource { Crypto.createEcPrivateKey(EcCurve.P256) }
             }
             configureOpenId4Vp {
 

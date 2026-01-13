@@ -37,9 +37,7 @@ class OpenId4VciManagerBuilderTest {
         authFlowRedirectionURI = "app://redirect",
         dPoPUsage = OpenId4VciManager.Config.DPoPUsage.IfSupported(),
         parUsage = OpenId4VciManager.Config.ParUsage.IF_SUPPORTED,
-        privateKeySource = {
-            Crypto.createEcPrivateKey(EcCurve.P256)
-        }
+
     )
 
     @Test

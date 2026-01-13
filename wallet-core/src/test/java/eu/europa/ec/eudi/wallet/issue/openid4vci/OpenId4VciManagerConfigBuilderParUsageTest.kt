@@ -35,7 +35,6 @@ class OpenId4VciManagerConfigBuilderParUsageTest(
             .withClientId("testClientId")
             .withAuthFlowRedirectionURI("app://redirect")
             .withParUsage(parUsage)
-            .withPrivateKeySource { Crypto.createEcPrivateKey(EcCurve.P256) }
 
 
     val config = builder.build()
