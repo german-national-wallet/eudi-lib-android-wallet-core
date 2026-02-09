@@ -31,7 +31,6 @@ plugins {
     // EUDI-added
     id("project.android.library")
     alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.serialization)
     id("kotlin-parcelize")
     // BEGIN EUDI-changed
