@@ -19,6 +19,7 @@ package eu.europa.ec.eudi.wallet.issue.openid4vci
 import android.content.Context
 import eu.europa.ec.eudi.wallet.document.DocumentManager
 import eu.europa.ec.eudi.wallet.logging.Logger
+import eu.europa.ec.eudi.wallet.provider.WalletKeyManager
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlin.test.Test
@@ -40,14 +41,16 @@ class AuthorizationHandlerIntegrationTest {
 
         val config = OpenId4VciManager.Config {
             withIssuerUrl("https://issuer.example.com")
-            withClientId("client-id")
+            withClientAuthenticationType(OpenId4VciManager.ClientAuthenticationType.None("client-id"))
             withAuthFlowRedirectionURI("eudi-wallet://callback")
         }
 
+        val walletKeyManager = mockk<WalletKeyManager>(relaxed = true)
         val manager = OpenId4VciManager.Builder(context)
             .config(config)
             .documentManager(documentManager)
             .logger(logger)
+            .walletKeyManager(walletKeyManager)
             .build() as DefaultOpenId4VciManager
 
         // Verify that the manager was created successfully
@@ -68,15 +71,17 @@ class AuthorizationHandlerIntegrationTest {
 
         val config = OpenId4VciManager.Config {
             withIssuerUrl("https://issuer.example.com")
-            withClientId("client-id")
+            withClientAuthenticationType(OpenId4VciManager.ClientAuthenticationType.None("client-id"))
             withAuthFlowRedirectionURI("eudi-wallet://callback")
             withAuthorizationHandler(customHandler)
         }
 
+        val walletKeyManager = mockk<WalletKeyManager>(relaxed = true)
         val manager = OpenId4VciManager.Builder(context)
             .config(config)
             .documentManager(documentManager)
             .logger(logger)
+            .walletKeyManager(walletKeyManager)
             .build() as DefaultOpenId4VciManager
 
         // Verify that the manager uses the custom handler
@@ -90,7 +95,7 @@ class AuthorizationHandlerIntegrationTest {
 
         val config = OpenId4VciManager.Config {
             withIssuerUrl("https://issuer.example.com")
-            withClientId("wallet-client")
+            withClientAuthenticationType(OpenId4VciManager.ClientAuthenticationType.None("wallet-client"))
             withAuthFlowRedirectionURI("eudi-wallet://oauth-callback")
             withAuthorizationHandler(customHandler)
             withDPoPUsage(OpenId4VciManager.Config.DPoPUsage.Disabled)
@@ -98,7 +103,7 @@ class AuthorizationHandlerIntegrationTest {
         }
 
         assertEquals("https://issuer.example.com", config.issuerUrl)
-        assertEquals("wallet-client", config.clientId)
+        assertEquals(OpenId4VciManager.ClientAuthenticationType.None("wallet-client"), config.clientAuthenticationType)
         assertEquals("eudi-wallet://oauth-callback", config.authFlowRedirectionURI)
         assertEquals(customHandler, config.authorizationHandler)
         assertEquals(OpenId4VciManager.Config.DPoPUsage.Disabled, config.dPoPUsage)
