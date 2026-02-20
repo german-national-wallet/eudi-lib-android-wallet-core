@@ -385,10 +385,26 @@ internal suspend fun verifiablePresentationForSdJwtVc(
 
         val query = disclosedDocument.disclosedItems
             .filterIsInstance<SdJwtVcItem>()
-            .map { item ->
-                ClaimPath(
-                    value = item.path.map { ClaimPathElement.Claim(it) }
-                )
+            .mapNotNull { item ->
+                // item.path is something like:
+                // ["credentialSubject", "address", "street"]
+                item.path
+                    .takeIf { it.isNotEmpty() }
+                    //    ClaimPath.claim("credentialSubject")
+                    ?.let { pathSegments ->
+                        pathSegments
+                            .drop(1) // remaining segments: ["address", "street"]
+                            // fold = repeatedly apply an operation while carrying a result
+                            .fold(
+                                initial = ClaimPath.claim(pathSegments.first())
+                            ) { builtPath, segment ->
+                                // builtPath = the ClaimPath built so far
+                                // segment = next string in the path
+                                // builtPath.claim("address")
+                                // then builtPath.claim("street")
+                                builtPath.claim(segment)
+                            }
+                    }
             }.toSet()
 
         // Check that at least one claim is disclosed, otherwise throw an error
