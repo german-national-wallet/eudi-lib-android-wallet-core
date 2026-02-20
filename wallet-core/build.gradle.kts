@@ -130,13 +130,13 @@ android {
         }
     }
     */
-
-    kotlinOptions {
-        jvmTarget = libs.versions.java.get()
-        freeCompilerArgs += listOf(
-            "-opt-in=kotlin.RequiresOptIn",
-            "-opt-in=kotlin.time.ExperimentalTime",
-        )
+    kotlin {
+        compilerOptions {
+            freeCompilerArgs.addAll(
+                "-opt-in=kotlin.RequiresOptIn",
+                "-opt-in=kotlin.time.ExperimentalTime",
+            )
+        }
     }
 }
 
@@ -199,15 +199,17 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.ktor.client.logging.jvm)
     implementation(libs.ktor.utils.jvm)
+    testImplementation(kotlin("test-junit"))
+    testImplementation(libs.junit4)
+    testRuntimeOnly(libs.junit.platform.launcher)
+    testRuntimeOnly(libs.junit.vintage.engine)
+    // END EUDI-added
     testImplementation(kotlin("test"))
     testImplementation(libs.mockk)
     testImplementation(libs.json)
     testImplementation(libs.kotlin.coroutines.test)
     testImplementation(libs.biometric.ktx)
     testImplementation(libs.robolectric)
-    // EUDI-added
-    testImplementation(libs.junit.jupiter)
-
     androidTestImplementation(libs.android.junit)
     androidTestImplementation(libs.mockito.android)
     androidTestImplementation(libs.test.core)
@@ -220,6 +222,9 @@ dependencies {
 }
 
 // EUDI-added
+tasks.withType<Test>().configureEach {
+    useJUnitPlatform()
+}
 excludeFromKoverReport(
     excludedClasses = KoverExclusionRules.CoreLogic.classes,
     excludedPackages = KoverExclusionRules.CoreLogic.packages,
