@@ -22,7 +22,7 @@ import eu.europa.ec.eudi.sdjwt.DefaultSdJwtOps
 import eu.europa.ec.eudi.sdjwt.DefaultSdJwtOps.recreateClaimsAndDisclosuresPerClaim
 import eu.europa.ec.eudi.sdjwt.JwtAndClaims
 import eu.europa.ec.eudi.sdjwt.SdJwt
-import eu.europa.ec.eudi.sdjwt.vc.SelectPath.Default.query
+import eu.europa.ec.eudi.sdjwt.vc.SelectPath.Default.select
 import eu.europa.ec.eudi.wallet.document.format.SdJwtVcFormat
 import eu.europa.ec.eudi.wallet.document.metadata.IssuerMetadata
 import eu.europa.ec.eudi.wallet.transactionLogging.TransactionLog
@@ -174,7 +174,7 @@ val SdJwt<JwtAndClaims>.claims: Map<List<String>, JsonElement?>
             this@claims.recreateClaimsAndDisclosuresPerClaim()
         }
         return claimPath.keys.associate { path ->
-            path.value.map(Any::toString) to jsonObject.query(path).getOrNull()?.toJsonElement()
+            path.value.map(Any::toString) to jsonObject.select(path).getOrNull()
         }
     }
 
