@@ -484,9 +484,6 @@ internal class DefaultOpenId4VciManager(
                     listener(IssueEvent.AuthorizationWithRefreshToken(request.authorizedRequest.refreshToken))
                 }
 
-                val cNonce = (authorizedRequest as AuthorizedRequest.ProofRequired).cNonce
-                listener(IssueEvent.CNonceAvailable(cNonce))
-
                 val issuedDocumentIds = mutableListOf<DocumentId>()
                 ProcessResponse(
                     documentManager = documentManager,
