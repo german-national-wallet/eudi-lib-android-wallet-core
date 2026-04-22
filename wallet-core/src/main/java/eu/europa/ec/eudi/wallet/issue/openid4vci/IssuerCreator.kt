@@ -291,11 +291,29 @@ internal class IssuerCreator(
             signer = walletWiaPopSigner
         )
 
+        val attestationBasedClientAuthentication = ClientAuthentication.AttestationBased(
+            attestationJWT = clientAttestationJWT,
+            popJwtSpec = poPJWTSpec
+        )
+        // Keep issuer-level state aligned with normal issuance path; downstream response
+        // processing relies on these fields for metadata/re-issuance handling.
+        clientAuthentication = attestationBasedClientAuthentication
+
+        val dpopSigner = DPopSigner.makeIfSupported(
+            context = context,
+            config = dpopConfig,
+            authorizationServerMetadata = authorizationServerMetadata,
+            logger = logger
+        )
+            .onSuccess { signer ->
+                dpopKeyAlias = (signer as SecureAreaDpopSigner).keyInfo.alias
+            }
+            .getOrElse {
+                throw IllegalStateException("Unable to initialize DPoP signer for attested issuance", it)
+            }
+
         return OpenId4VCIConfig(
-            clientAuthentication = ClientAuthentication.AttestationBased(
-                attestationJWT = clientAttestationJWT,
-                popJwtSpec = poPJWTSpec
-            ),
+            clientAuthentication = attestationBasedClientAuthentication,
             authFlowRedirectionURI = URI.create(authFlowRedirectionURI),
             encryptionSupportConfig = EncryptionSupportConfig(
                 credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED,
@@ -304,23 +322,7 @@ internal class IssuerCreator(
             ),
             parUsage = ParUsage.Required,
             authorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
-            dPoPSigner = DPopSigner.makeIfSupported(
-                context = context,
-                config = dpopConfig,
-                authorizationServerMetadata = authorizationServerMetadata,
-                logger = logger
-            )
-                .getOrElse {
-                    logger?.log(
-                        Logger.Record(
-                            level = Logger.Companion.LEVEL_DEBUG,
-                            message = "DPoP not supported: ${it.message}",
-                            sourceClassName = "eu.europa.ec.eudi.wallet.issue.openid4vci.IssuerCreator",
-                            sourceMethod = "toOpenId4VCIConfig"
-                        )
-                    )
-                    null
-                },
+            dPoPSigner = dpopSigner,
             clock = Clock.systemDefaultZone(),
             issuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
         )
