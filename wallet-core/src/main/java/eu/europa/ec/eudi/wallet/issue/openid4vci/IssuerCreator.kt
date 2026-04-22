@@ -280,4 +280,51 @@ internal class IssuerCreator(
             }
         )
     }
+    private suspend fun OpenId4VciManager.Config.toOpenId4VCIConfigWithAttestation(
+        authorizationServerMetadata: CIAuthorizationServerMetadata,
+        attestationJWT: SignedJWT,
+        walletWiaPopSigner: Signer<JWK>,
+    ): OpenId4VCIConfig {
+        val clientAttestationJWT = ClientAttestationJWT(attestationJWT)
+
+        val poPJWTSpec = ClientAttestationPoPJWTSpec(
+            signer = walletWiaPopSigner
+        )
+
+        val attestationBasedClientAuthentication = ClientAuthentication.AttestationBased(
+            attestationJWT = clientAttestationJWT,
+            popJwtSpec = poPJWTSpec
+        )
+        // Keep issuer-level state aligned with normal issuance path; downstream response
+        // processing relies on these fields for metadata/re-issuance handling.
+        clientAuthentication = attestationBasedClientAuthentication
+
+        val dpopSigner = DPopSigner.makeIfSupported(
+            context = context,
+            config = dpopConfig,
+            authorizationServerMetadata = authorizationServerMetadata,
+            logger = logger
+        )
+            .onSuccess { signer ->
+                dpopKeyAlias = (signer as SecureAreaDpopSigner).keyInfo.alias
+            }
+            .getOrElse {
+                throw IllegalStateException("Unable to initialize DPoP signer for attested issuance", it)
+            }
+
+        return OpenId4VCIConfig(
+            clientAuthentication = attestationBasedClientAuthentication,
+            authFlowRedirectionURI = URI.create(authFlowRedirectionURI),
+            encryptionSupportConfig = EncryptionSupportConfig(
+                credentialResponseEncryptionPolicy = CredentialResponseEncryptionPolicy.SUPPORTED,
+                ecConfig = EcConfig(ecKeyCurve = Curve.P_256),
+                rsaConfig = RsaConfig(rcaKeySize = 2048)
+            ),
+            parUsage = ParUsage.Required,
+            authorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
+            dPoPSigner = dpopSigner,
+            clock = Clock.systemDefaultZone(),
+            issuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
+        )
+    }
 }
