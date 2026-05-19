@@ -23,6 +23,7 @@ import java.util.Locale
 
 plugins {
     id("project.android.library")
+    alias(libs.plugins.kotlin.serialization)
     id("kotlin-parcelize")
     alias(libs.plugins.dokka)
     alias(libs.plugins.dependency.license.report)
@@ -96,14 +97,14 @@ android {
             withSourcesJar()
         }
     }
+}
 
-    kotlin {
-        compilerOptions {
-            freeCompilerArgs.addAll(
-                "-opt-in=kotlin.RequiresOptIn",
-                "-opt-in=kotlin.time.ExperimentalTime",
-            )
-        }
+kotlin {
+    compilerOptions {
+        freeCompilerArgs.addAll(
+            "-opt-in=kotlin.RequiresOptIn",
+            "-opt-in=kotlin.time.ExperimentalTime",
+        )
     }
 }
 

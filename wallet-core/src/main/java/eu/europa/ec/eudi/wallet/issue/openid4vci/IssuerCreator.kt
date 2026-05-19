@@ -322,7 +322,7 @@ internal class IssuerCreator(
             ),
             parUsage = ParUsage.Required,
             authorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
-            dPoPSigner = dpopSigner,
+            dPoPSigner = walletWiaPopSigner,
             clock = Clock.systemDefaultZone(),
             issuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
         )
