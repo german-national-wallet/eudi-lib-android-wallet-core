@@ -76,6 +76,24 @@ internal class IssuerCreator(
     internal lateinit var clientAuthentication: ClientAuthentication
         private set
 
+    internal suspend fun currentDpopJkt(): String? {
+        val alias = dpopKeyAlias ?: return null
+        return dpopJktFromAlias(alias)
+    }
+
+    internal suspend fun dpopJktFromAlias(alias: String): String? {
+        val resolvedConfig = when (val cfg = config.dpopConfig) {
+            DPopConfig.Disabled -> return null
+            DPopConfig.Default -> DPopConfig.Default.make(context)
+            is DPopConfig.Custom -> cfg
+        }
+        val keyInfo = runCatching {
+            resolvedConfig.secureArea.getKeyInfo(alias)
+        }.getOrNull() ?: return null
+        val jwk = JWK.parse(keyInfo.publicKey.toJwk().toString())
+        return jwk.computeThumbprint().toString()
+    }
+
     /**
      * Creates an [Issuer] from the given [Offer].
      * @param offer The [Offer].
@@ -322,7 +340,7 @@ internal class IssuerCreator(
             ),
             parUsage = ParUsage.Required,
             authorizeIssuanceConfig = AuthorizeIssuanceConfig.FAVOR_SCOPES,
-            dPoPSigner = walletWiaPopSigner,
+            dPoPSigner = dpopSigner,
             clock = Clock.systemDefaultZone(),
             issuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
         )
