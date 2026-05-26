@@ -229,6 +229,28 @@ internal class DefaultOpenId4VciManager(
         executor: Executor?,
         onIssueEvent: OpenId4VciManager.OnIssueEvent,
     ) {
+        issueDocumentByConfigurationIdentifiersAttested(
+            issuerUrl = issuerUrl,
+            credentialConfigurationIds = listOf(credentialConfigurationId),
+            walletAttestation = walletAttestation,
+            walletWiaPopPublicKey = walletWiaPopPublicKey,
+            walletWiaPopPrivateKey = walletWiaPopPrivateKey,
+            txCode = txCode,
+            executor = executor,
+            onIssueEvent = onIssueEvent,
+        )
+    }
+
+    override fun issueDocumentByConfigurationIdentifiersAttested(
+        issuerUrl: String,
+        credentialConfigurationIds: List<String>,
+        walletAttestation: SignedJWT,
+        walletWiaPopPublicKey: JWK,
+        walletWiaPopPrivateKey: PrivateKey,
+        txCode: String?,
+        executor: Executor?,
+        onIssueEvent: OpenId4VciManager.OnIssueEvent,
+    ) {
         launch(executor, onIssueEvent) { coroutineScope, listener ->
             try {
                 val walletWiaPopSigner = signerFromPrivateKey(
@@ -244,16 +266,17 @@ internal class DefaultOpenId4VciManager(
                 )
 
                 val issuer = issuerCreator.createIssuerWithAttestation(
+                    issuerUrl = issuerUrl,
                     attestationJWT = walletAttestation,
                     walletWiaPopSigner = walletWiaPopSigner,
-                    credentialConfigurationIdentifiers = listOf(
-                        CredentialConfigurationIdentifier(credentialConfigurationId)
-                    )
+                    credentialConfigurationIdentifiers = credentialConfigurationIds.map {
+                        CredentialConfigurationIdentifier(it)
+                    }
                 )
                 doIssue(issuer, Offer(issuer.credentialOffer), txCode, listener)
             } catch (e: Throwable) {
                 listener(failure(e))
-                coroutineScope.cancel("issueDocumentByConfigurationIdentifierAttested failed", e)
+                coroutineScope.cancel("issueDocumentByConfigurationIdentifiersAttested failed", e)
             }
         }
     }
