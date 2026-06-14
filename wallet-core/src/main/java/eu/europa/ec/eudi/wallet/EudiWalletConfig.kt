@@ -31,6 +31,7 @@ import eu.europa.ec.eudi.wallet.document.DocumentExtensions.getDefaultCreateDocu
 import eu.europa.ec.eudi.wallet.internal.getCertificate
 import eu.europa.ec.eudi.wallet.issue.openid4vci.OpenId4VciManager
 import eu.europa.ec.eudi.wallet.logging.Logger
+import eu.europa.ec.eudi.wallet.presentation.ReverseEngagementStarter
 import eu.europa.ec.eudi.wallet.transfer.openId4vp.OpenId4VpConfig
 import eu.europa.ec.eudi.wallet.statium.DocumentStatusResolverConfigBuilder
 import eu.europa.ec.eudi.wallet.trust.EtsiTrustConfig
@@ -241,6 +242,29 @@ class EudiWalletConfig {
      */
     fun configureDCAPI(dcapiConfig: DCAPIConfig.Builder.() -> Unit) = apply {
         this.dcapiConfig = DCAPIConfig.Builder().apply(dcapiConfig).build()
+    }
+
+    /**
+     * Active [ReverseEngagementStarter] that drives the DC API over ISO 18013-5 / reverse
+     * engagement flow. When set, [eu.europa.ec.eudi.wallet.presentation.PresentationManager.startReverseEngagement]
+     * delegates to it. Concrete implementation typically lives in the proximity-feature
+     * module; core/wallet-core only exposes the entry-point surface.
+     *
+     * Unlike [openId4VpConfig] and [dcapiConfig] (which are pure config used by
+     * core/wallet-core to construct managers), the reverse-engagement starter is a live
+     * object whose implementation depends on Multipaz and Android APIs that don't belong
+     * inside the canonical wallet API. So the wallet doesn't construct it; the
+     * proximity-feature module provides one and the app wiring passes it in.
+     */
+    var reverseEngagementStarter: ReverseEngagementStarter? = null
+        private set
+
+    /**
+     * Configure the reverse-engagement starter that backs
+     * [eu.europa.ec.eudi.wallet.presentation.PresentationManager.startReverseEngagement].
+     */
+    fun configureReverseEngagement(starter: ReverseEngagementStarter) = apply {
+        this.reverseEngagementStarter = starter
     }
 
     var documentManagerIdentifier: String = DEFAULT_DOCUMENT_MANAGER_IDENTIFIER

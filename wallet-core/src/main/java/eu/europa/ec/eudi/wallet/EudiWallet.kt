@@ -529,7 +529,9 @@ interface EudiWallet : DocumentManager, PresentationManager, DocumentStatusResol
                 transferManager = transferManager,
                 openId4vpManager = openId4vpManager,
                 dcapiManager = dcapiManager,
-                nfcEngagementServiceClass = config.nfcEngagementServiceClass
+                nfcEngagementServiceClass = config.nfcEngagementServiceClass,
+                // Read live so callers can wire the starter after wallet construction.
+                reverseEngagementStarter = { config.reverseEngagementStarter },
             )
         }
 

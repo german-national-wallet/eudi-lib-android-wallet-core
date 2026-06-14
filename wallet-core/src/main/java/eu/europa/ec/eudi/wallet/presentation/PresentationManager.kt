@@ -116,6 +116,25 @@ interface PresentationManager : TransferEvent.Listenable, ReaderTrustStoreAware 
     fun startDCAPIPresentation(intent: Intent)
 
     /**
+     * Starts a reverse-engagement (DC API over ISO 18013-5) presentation flow.
+     *
+     * Reverse engagement is the cross-device proximity DC API path: the verifier acts as
+     * BLE central and publishes a ReaderEngagement (as a QR code or similar), the wallet
+     * scans it, opens a BLE central transport, runs the ISO 18013-5 § 12.2 session
+     * encryption, receives the verifier's OID4VP JAR over the encrypted session, and
+     * resolves it. Concrete BLE + crypto + parser machinery lives in the proximity-feature
+     * module; this entry point delegates to the [ReverseEngagementStarter] configured on
+     * [EudiWalletConfig.configureReverseEngagement].
+     *
+     * @param readerEngagementCbor the raw CBOR bytes of the verifier's ReaderEngagement
+     *   as recovered from the scanned QR code
+     * @throws IllegalStateException if no reverse-engagement starter has been configured
+     *   on the wallet, or if a session is already in flight
+     * @throws IllegalArgumentException if the engagement bytes cannot be parsed
+     */
+    fun startReverseEngagement(readerEngagementCbor: ByteArray)
+
+    /**
      * Send a response to verifier
      *
      * The response should be generated through the [eu.europa.ec.eudi.iso18013.transfer.response.RequestProcessor.ProcessedRequest.Success.generateResponse]

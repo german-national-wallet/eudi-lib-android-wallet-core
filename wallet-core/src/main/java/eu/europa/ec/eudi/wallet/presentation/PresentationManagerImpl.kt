@@ -47,6 +47,7 @@ class PresentationManagerImpl @JvmOverloads constructor(
     @VisibleForTesting internal val openId4vpManager: OpenId4VpManager? = null,
     @VisibleForTesting internal val dcapiManager: DCAPIManager? = null,
     override val nfcEngagementServiceClass: Class<out NfcEngagementService>? = null,
+    @VisibleForTesting internal val reverseEngagementStarter: () -> ReverseEngagementStarter? = { null },
 ) : PresentationManager {
 
     private var _readerTrustStore: ReaderTrustStore? = null
@@ -99,6 +100,19 @@ class PresentationManagerImpl @JvmOverloads constructor(
             ?.takeIf { it.config.schemes.contains(uri.scheme) }
             ?.resolveRequestUri(uri.toString())
             ?: error("Not supported scheme")
+    }
+
+    override fun startReverseEngagement(readerEngagementCbor: ByteArray) {
+        // Resolve the starter live - it may be wired into the wallet config after
+        // PresentationManagerImpl construction (as happens in the DI-driven flow where
+        // EudiWallet and ReverseEngagementStarter are built independently to break a
+        // construction-time cycle).
+        val starter = reverseEngagementStarter()
+            ?: error(
+                "Reverse engagement is not configured for this wallet instance. " +
+                    "Pass a ReverseEngagementStarter via EudiWalletConfig.configureReverseEngagement().",
+            )
+        starter.start(readerEngagementCbor)
     }
 
     override fun startDCAPIPresentation(intent: Intent) {
