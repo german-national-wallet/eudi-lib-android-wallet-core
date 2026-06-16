@@ -27,6 +27,7 @@ import eu.europa.ec.eudi.iso18013.transfer.readerauth.ReaderTrustStore
 import eu.europa.ec.eudi.iso18013.transfer.readerauth.ReaderTrustStoreAware
 import eu.europa.ec.eudi.iso18013.transfer.response.Response
 import eu.europa.ec.eudi.iso18013.transfer.response.device.DeviceResponse
+import eu.europa.ec.eudi.openid4vp.OpenId4Vp
 import eu.europa.ec.eudi.wallet.dcapi.DCAPIManager
 import eu.europa.ec.eudi.wallet.dcapi.DCAPIRequest
 import eu.europa.ec.eudi.wallet.dcapi.DCAPIResponse
@@ -49,6 +50,9 @@ class PresentationManagerImpl @JvmOverloads constructor(
     override val nfcEngagementServiceClass: Class<out NfcEngagementService>? = null,
     @VisibleForTesting internal val reverseEngagementStarter: () -> ReverseEngagementStarter? = { null },
 ) : PresentationManager {
+
+    override val openId4VpReader: OpenId4Vp?
+        get() = openId4vpManager?.openId4Vp
 
     private var _readerTrustStore: ReaderTrustStore? = null
     override var readerTrustStore: ReaderTrustStore?

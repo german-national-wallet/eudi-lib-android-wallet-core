@@ -87,8 +87,11 @@ class OpenId4VpManager(
     /**
      * Lazy initialization of the OpenID4VP protocol handler with logging and content negotiation.
      * Uses the configuration and trust anchor from the request processor.
+     *
+     * Exposed at module level so reverse-engagement DC-API flows can share the same fully
+     * trust-anchored resolver instance (see [EudiWallet.openId4VpReader]).
      */
-    private val openId4Vp by lazy {
+    internal val openId4Vp by lazy {
         OpenId4Vp.overRedirects(
             openId4VPConfig = makeOpenId4VPConfig(
                 config,

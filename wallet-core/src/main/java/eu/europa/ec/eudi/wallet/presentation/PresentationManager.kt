@@ -23,6 +23,7 @@ import eu.europa.ec.eudi.iso18013.transfer.TransferEvent
 import eu.europa.ec.eudi.iso18013.transfer.engagement.NfcEngagementService
 import eu.europa.ec.eudi.iso18013.transfer.readerauth.ReaderTrustStoreAware
 import eu.europa.ec.eudi.iso18013.transfer.response.Response
+import eu.europa.ec.eudi.openid4vp.OpenId4Vp
 import eu.europa.ec.eudi.wallet.EudiWallet
 import eu.europa.ec.eudi.wallet.presentation.SessionTerminationFlag.Companion.SEND_SESSION_TERMINATION_MESSAGE
 
@@ -49,6 +50,20 @@ import eu.europa.ec.eudi.wallet.presentation.SessionTerminationFlag.Companion.SE
 interface PresentationManager : TransferEvent.Listenable, ReaderTrustStoreAware {
 
     val nfcEngagementServiceClass: Class<out NfcEngagementService>?
+
+    /**
+     * The OID4VP resolver configured with the wallet's trust policy and supported client-id
+     * prefixes, or `null` if no OpenId4Vp configuration was set on the wallet.
+     *
+     * This is the same resolver instance that backs the main OID4VP-over-HTTPS flow inside
+     * the wallet's [OpenId4VpManager][eu.europa.ec.eudi.wallet.transfer.openId4vp.OpenId4VpManager].
+     * It is exposed for the reverse-engagement DC-API-over-ISO-18013-5 flow, where the JAR
+     * JWT arrives over BLE inside a `SessionData` frame rather than via an `openid4vp://` URL
+     * fetched over HTTPS. Reverse-engagement callers hand the JAR to this resolver by value
+     * so it validates `verifier_attestation`, `x509_san_dns`, and the other client-id prefix
+     * variants the wallet is configured to accept.
+     */
+    val openId4VpReader: OpenId4Vp?
 
     /**
      * Starts the proximity presentation.
