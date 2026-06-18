@@ -1,6 +1,5 @@
 package eu.europa.ec.eudi.wallet.transfer.openId4vp
 
-import android.net.Uri
 import eu.europa.ec.eudi.iso18013.transfer.TransferEvent
 import eu.europa.ec.eudi.iso18013.transfer.response.RequestProcessor
 import eu.europa.ec.eudi.openid4vp.Consensus
@@ -20,17 +19,21 @@ import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.mockkStatic
 import io.mockk.spyk
-import io.mockk.unmockkStatic
 import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import org.junit.After
 import org.junit.Before
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 import java.net.URL
 
 @OptIn(ExperimentalCoroutinesApi::class)
+@RunWith(RobolectricTestRunner::class)
 class OpenId4VpManagerRejectionTest {
 
     val testDispatcher = UnconfinedTestDispatcher()
@@ -52,83 +55,78 @@ class OpenId4VpManagerRejectionTest {
         every { makeOpenId4VPConfig(any(), any()) } returns mockk()
     }
 
-    @Test
-    fun `when user rejects transaction, NegativeConsensus is dispatched and ResponseSent event is emitted`()  {
-        mockkStatic(Uri::class)
-        val mockUri = mockk<Uri>()
-        every { Uri.parse("openid4vp://example-request-uri") } returns mockUri
-        every { mockUri.scheme } returns "openid4vp"
+    @After
+    fun afterTests() {
+        Dispatchers.resetMain()
+    }
 
+    @Test
+    fun `when user rejects transaction, NegativeConsensus is dispatched and ResponseSent event is emitted`() = runTest {
         val config = mockk<OpenId4VpConfig>(relaxed = true)
 
         val mockOpenId4Vp = mockk<OpenId4Vp>(relaxed = true)
 
-
         every { OpenId4Vp(any(), any()) } returns mockOpenId4Vp
 
-        try {
-            val mockResponseMode = ResponseMode.DirectPost(URL("https://placeholder.com"))
-            val mockResolvedRequest = mockk<ResolvedRequestObject>(relaxed = true) {
-                every { responseMode } returns mockResponseMode
-                every { responseEncryptionSpecification } returns null
-            }
+        val mockResponseMode = ResponseMode.DirectPost(URL("https://placeholder.com"))
+        val mockResolvedRequest = mockk<ResolvedRequestObject>(relaxed = true) {
+            every { responseMode } returns mockResponseMode
+            every { responseEncryptionSpecification } returns null
+        }
 
-            // Stub Resolution
-            coEvery { mockOpenId4Vp.resolveRequestUri(any()) } returns Resolution.Success(mockResolvedRequest)
+        // Stub Resolution
+        coEvery { mockOpenId4Vp.resolveRequestUri(any()) } returns Resolution.Success(mockResolvedRequest)
 
-            // Stub Dispatch (The core verification target)
-            coEvery {
-                mockOpenId4Vp.dispatch(
-                    request = mockResolvedRequest,
-                    consensus = match { it is Consensus.NegativeConsensus },
-                    encryptionParameters = null
-                )
-            } returns DispatchOutcome.VerifierResponse.Accepted(null)
-
-            // Stub Config
-            every { config.schemes } returns listOf("openid4vp")
-
-            // Stub Processor
-            val mockProcessedRequest = mockk<RequestProcessor.ProcessedRequest>(relaxed = true)
-            coEvery { requestProcessor.process(any()) } returns mockProcessedRequest
-
-            val manager = OpenId4VpManager(
-                config = config,
-                requestProcessor = requestProcessor,
-                logger = logger
+        // Stub Dispatch (The core verification target)
+        coEvery {
+            mockOpenId4Vp.dispatch(
+                request = mockResolvedRequest,
+                consensus = match { it is Consensus.NegativeConsensus },
+                encryptionParameters = null
             )
+        } returns DispatchOutcome.VerifierResponse.Accepted(null)
 
-            val listener = spyk(object : TransferEvent.Listener {
-                override fun onTransferEvent(event: TransferEvent) {
-                    println("TEST LOG: $event")
-                }
-            })
-            manager.addTransferEventListener(listener)
+        // Stub Config
+        every { config.schemes } returns listOf("openid4vp")
 
-            manager.resolveRequestUri("openid4vp://example-request-uri")
+        // Stub Processor
+        val mockProcessedRequest = mockk<RequestProcessor.ProcessedRequest>(relaxed = true)
+        coEvery { requestProcessor.process(any()) } returns mockProcessedRequest
 
-            // Ensure RequestReceived happens before we reject
-            verify(timeout = 2000) {
-                listener.onTransferEvent(ofType(TransferEvent.RequestReceived::class))
+        val manager = OpenId4VpManager(
+            config = config,
+            requestProcessor = requestProcessor,
+            logger = logger,
+            listenersExecutor = Runnable::run,
+        )
+
+        val listener = spyk(object : TransferEvent.Listener {
+            override fun onTransferEvent(event: TransferEvent) {
+                println("TEST LOG: $event")
             }
+        })
+        manager.addTransferEventListener(listener)
 
-            manager.reject()
+        manager.resolveRequestUri("openid4vp://example-request-uri")
 
-            verify(timeout = 2000) {
-                listener.onTransferEvent(ofType(TransferEvent.ResponseSent::class))
-            }
+        // Ensure RequestReceived happens before we reject
+        verify(timeout = 2000) {
+            listener.onTransferEvent(ofType(TransferEvent.RequestReceived::class))
+        }
 
-            // Double check the library interaction
-            coVerify {
-                mockOpenId4Vp.dispatch(
-                    request = mockResolvedRequest,
-                    consensus = Consensus.NegativeConsensus,
-                    encryptionParameters = null
-                )
-            }
+        manager.reject()
 
-        } finally {
-            unmockkStatic(Uri::class)
+        verify(timeout = 2000) {
+            listener.onTransferEvent(ofType(TransferEvent.ResponseSent::class))
+        }
+
+        // Double check the library interaction
+        coVerify {
+            mockOpenId4Vp.dispatch(
+                request = mockResolvedRequest,
+                consensus = Consensus.NegativeConsensus,
+                encryptionParameters = null
+            )
         }
     }
 }

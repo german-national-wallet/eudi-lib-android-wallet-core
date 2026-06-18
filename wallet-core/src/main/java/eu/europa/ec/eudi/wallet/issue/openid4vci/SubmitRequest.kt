@@ -98,11 +98,32 @@ internal class SubmitRequest(
         offeredDocument: Offer.OfferedDocument,
         keyUnlockData: Map<KeyAlias, KeyUnlockData?>?,
     ): Pair<AuthorizedRequest, SubmissionOutcome> {
-        val canBeIssuedWithoutAttestation = offeredDocument.configuration.proofTypesSupported.values
-            .filterIsInstance<ProofTypeMeta.Jwt>()
-            .any { it.keyAttestationRequirement is KeyAttestationRequirement.NotRequired }
+        // PID issuance architecture step 061 can require proof_type=attestation even
+        // when client authentication itself is not configured as attestation-based.
+        val proofType =
+            offeredDocument.configuration.proofTypesSupported.values.filterIsInstance<ProofTypeMeta.Attestation>()
+                .firstOrNull()
+        if (proofType != null) {
+            return requestWithAttestationProof(payload, signers)
+        }
 
-        check(canBeIssuedWithoutAttestation) {
+        val jwtProofTypes =
+            offeredDocument.configuration.proofTypesSupported.values.filterIsInstance<ProofTypeMeta.Jwt>()
+
+        val jwtWithAttest =
+            jwtProofTypes.firstOrNull() { it.keyAttestationRequirement is KeyAttestationRequirement.Required }
+        if (jwtWithAttest != null) {
+            return authorizedRequest.requestWithJwtProofWithAttestation(
+                payload, signers, keyUnlockData,
+                unlockResume = { updatedKeyUnlockData ->
+                    submitRequest(unsignedDocument, offeredDocument, updatedKeyUnlockData)
+                }
+            )
+        }
+
+        val jwtWithoutAttest =
+            jwtProofTypes.firstOrNull { it.keyAttestationRequirement is KeyAttestationRequirement.NotRequired }
+        check(jwtWithoutAttest != null) {
             "Offered document requires attestation proof, but client authentication type is None"
         }
 

@@ -160,6 +160,7 @@ class OpenId4VpManagerTest {
             every { vpToken } returns mockVpToken
             every { resolvedRequestObject } returns mockResolvedRequestObject
             every { encryptionParameters } returns encryptionParametersMock
+            every { respondedDocuments } returns emptyMap()
         }
         coEvery {
             openId4Vp.dispatch(
