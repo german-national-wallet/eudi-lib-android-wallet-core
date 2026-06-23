@@ -350,7 +350,7 @@ internal fun List<Format>.toVpFormats(): VpFormatsSupported {
 /**
  * Extension property to convert an [EncryptionAlgorithm] to Nimbus [JWEAlgorithm].
  */
-internal val EncryptionAlgorithm.nimbus: JWEAlgorithm
+val EncryptionAlgorithm.nimbus: JWEAlgorithm
     get() = when (this) {
         EncryptionAlgorithm.ECDH_ES -> JWEAlgorithm.ECDH_ES
         EncryptionAlgorithm.ECDH_ES_A128KW -> JWEAlgorithm.ECDH_ES_A128KW
@@ -358,7 +358,7 @@ internal val EncryptionAlgorithm.nimbus: JWEAlgorithm
         EncryptionAlgorithm.ECDH_ES_A256KW -> JWEAlgorithm.ECDH_ES_A256KW
     }
 
-internal val EncryptionMethod.nimbus: com.nimbusds.jose.EncryptionMethod
+val EncryptionMethod.nimbus: com.nimbusds.jose.EncryptionMethod
     get() = when (this) {
         EncryptionMethod.A128CBC_HS256 -> com.nimbusds.jose.EncryptionMethod.A128CBC_HS256
         EncryptionMethod.A192CBC_HS384 -> com.nimbusds.jose.EncryptionMethod.A192CBC_HS384
