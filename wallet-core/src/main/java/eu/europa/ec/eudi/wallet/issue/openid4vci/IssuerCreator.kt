@@ -47,6 +47,8 @@ import eu.europa.ec.eudi.wallet.issue.openid4vci.CredentialConfigurationFilter.C
 import eu.europa.ec.eudi.wallet.issue.openid4vci.CredentialConfigurationFilter.Companion.VctFilter
 import eu.europa.ec.eudi.wallet.issue.openid4vci.OpenId4VciManager.Companion.TAG
 import eu.europa.ec.eudi.wallet.issue.openid4vci.dpop.DPopConfig
+import eu.europa.ec.eudi.wallet.issue.openid4vci.dpop.DPopSigner
+import eu.europa.ec.eudi.wallet.issue.openid4vci.dpop.KeyAttestedSecureAreaDpopSigner
 import eu.europa.ec.eudi.wallet.issue.openid4vci.dpop.SecureAreaDpopSigner
 import eu.europa.ec.eudi.wallet.internal.e
 import eu.europa.ec.eudi.wallet.logging.Logger
@@ -77,8 +79,14 @@ internal class IssuerCreator(
     internal var clientAttestationPopKeyId: String? = null
         private set
 
-    internal var dpopKeyAlias: String? = null
-        private set
+    private var dpopSigner: DPopSigner? = null
+
+    internal val dpopKeyAlias: String?
+        get() = when (val signer = dpopSigner) {
+            is SecureAreaDpopSigner -> signer.keyInfo.alias
+            is KeyAttestedSecureAreaDpopSigner -> signer.keyInfo.alias
+            else -> null
+        }
 
     internal lateinit var clientAuthentication: ClientAuthentication
         private set
@@ -89,13 +97,14 @@ internal class IssuerCreator(
     }
 
     internal suspend fun dpopJktFromAlias(alias: String): String? {
-        val resolvedConfig = when (val cfg = config.dpopConfig) {
+        val secureArea = when (val cfg = config.dpopConfig) {
             DPopConfig.Disabled -> return null
-            DPopConfig.Default -> DPopConfig.Default.make(context)
-            is DPopConfig.Custom -> cfg
+            DPopConfig.Default -> DPopConfig.Default.make(context).secureArea
+            is DPopConfig.Custom -> cfg.secureArea
+            is DPopConfig.KeyAttested -> cfg.secureArea
         }
         val keyInfo = runCatching {
-            resolvedConfig.secureArea.getKeyInfo(alias)
+            secureArea.getKeyInfo(alias)
         }.getOrNull() ?: return null
         val jwk = JWK.parse(keyInfo.publicKey.toJwk().toString())
         return jwk.computeThumbprint().toString()
@@ -113,6 +122,7 @@ internal class IssuerCreator(
         attestationJWT: SignedJWT,
         walletWiaPopSigner: Signer<JWK>,
         credentialConfigurationIdentifiers: List<CredentialConfigurationIdentifier>,
+        existingDpopKeyAlias: String? = null,
     ): Issuer {
         val authorizationServerMetadata = CredentialIssuerId(issuerUrl)
             .map { getIssuerMetadata(it).second.first() }
@@ -122,7 +132,8 @@ internal class IssuerCreator(
             config = config.toOpenId4VCIConfigWithAttestation(
                 authorizationServerMetadata,
                 attestationJWT,
-                walletWiaPopSigner
+                walletWiaPopSigner,
+                existingDpopKeyAlias,
             ),
             credentialIssuerId = CredentialIssuerId(issuerUrl).getOrThrow(),
             credentialConfigurationIdentifiers = credentialConfigurationIdentifiers,
@@ -282,7 +293,7 @@ internal class IssuerCreator(
                             return SecureAreaDpopSigner.fromExistingKey(
                                 resolvedConfig, existingDpopKeyAlias, logger
                             ).also {
-                                dpopKeyAlias = it.keyInfo.alias
+                                dpopSigner = it
                             }
                         }
                     }
@@ -294,7 +305,53 @@ internal class IssuerCreator(
                             return SecureAreaDpopSigner(
                                 resolvedConfig, listOf(signingAlg), logger
                             ).also {
-                                dpopKeyAlias = it.keyInfo.alias
+                                dpopSigner = it
+                            }
+                        }
+                    }
+                }
+
+                DPoPUsage.IfSupported(VciDPoPConfig(provisionDPoPSigner))
+            }
+
+            is DPopConfig.KeyAttested -> {
+                val cfg = dpopConfig as DPopConfig.KeyAttested
+                val signingAlg = cfg.secureArea.supportedAlgorithms
+                    .firstOrNull { it.isSigning && it.joseAlgorithmIdentifier != null }
+                    ?: throw IllegalStateException("No signing algorithm available for DPoP")
+
+                val provisionDPoPSigner = if (existingDpopKeyAlias != null) {
+                    // Re-issuance: reuse the existing DPoP key bound to the access token
+                    object : VciProvisionDPoPSigner {
+                        override val popAlgorithm = JwsAlgorithm(signingAlg.joseAlgorithmIdentifier!!)
+                        override suspend fun invoke(authorizationServer: HttpsUrl): Signer<JWK> {
+                            val reuseConfig = DPopConfig.Custom(
+                                secureArea = cfg.secureArea,
+                                createKeySettingsBuilder = {
+                                    error("Existing DPoP keys do not require create-key settings")
+                                },
+                                keyUnlockDataProvider = cfg.keyUnlockDataProvider,
+                            )
+                            return SecureAreaDpopSigner.fromExistingKey(
+                                reuseConfig, existingDpopKeyAlias, logger
+                            ).also {
+                                dpopSigner = it
+                            }
+                        }
+                    }
+                } else {
+                    // Normal issuance: provisional key until the token endpoint nonce is known,
+                    // then a nonce-bound key-attested key.
+                    object : VciProvisionDPoPSigner {
+                        override val popAlgorithm = JwsAlgorithm(signingAlg.joseAlgorithmIdentifier!!)
+                        override suspend fun invoke(authorizationServer: HttpsUrl): Signer<JWK> {
+                            val provisionalConfig = DPopConfig.Default.make(context)
+                            val provisionalSigner =
+                                SecureAreaDpopSigner(provisionalConfig, listOf(signingAlg), logger)
+                            return KeyAttestedSecureAreaDpopSigner(
+                                provisionalSigner, cfg, listOf(signingAlg), logger
+                            ).also {
+                                dpopSigner = it
                             }
                         }
                     }
@@ -323,6 +380,7 @@ internal class IssuerCreator(
         authorizationServerMetadata: CIAuthorizationServerMetadata,
         attestationJWT: SignedJWT,
         walletWiaPopSigner: Signer<JWK>,
+        existingDpopKeyAlias: String? = null,
     ): OpenId4VCIConfig {
         // Build attestation-based client authentication from the externally supplied wallet
         // instance attestation JWT and its PoP signer, wrapped in the openid4vci 0.12.1
