@@ -46,6 +46,7 @@ import eu.europa.ec.eudi.wallet.issue.openid4vci.CredentialConfigurationFilter.C
 import eu.europa.ec.eudi.wallet.issue.openid4vci.CredentialConfigurationFilter.Companion.VctFilter
 import eu.europa.ec.eudi.wallet.issue.openid4vci.dpop.DPopConfig
 import eu.europa.ec.eudi.wallet.issue.openid4vci.dpop.DPopSigner
+import eu.europa.ec.eudi.wallet.issue.openid4vci.dpop.KeyAttestedSecureAreaDpopSigner
 import eu.europa.ec.eudi.wallet.issue.openid4vci.dpop.SecureAreaDpopSigner
 import eu.europa.ec.eudi.wallet.logging.Logger
 import eu.europa.ec.eudi.wallet.provider.WalletAttestationsProvider
@@ -70,8 +71,14 @@ internal class IssuerCreator(
     internal var clientAttestationPopKeyId: String? = null
         private set
 
-    internal var dpopKeyAlias: String? = null
-        private set
+    private var dpopSigner: DPopSigner? = null
+
+    internal val dpopKeyAlias: String?
+        get() = when (val signer = dpopSigner) {
+            is SecureAreaDpopSigner -> signer.keyInfo.alias
+            is KeyAttestedSecureAreaDpopSigner -> signer.keyInfo.alias
+            else -> null
+        }
 
     internal lateinit var clientAuthentication: ClientAuthentication
         private set
@@ -82,13 +89,14 @@ internal class IssuerCreator(
     }
 
     internal suspend fun dpopJktFromAlias(alias: String): String? {
-        val resolvedConfig = when (val cfg = config.dpopConfig) {
+        val secureArea = when (val cfg = config.dpopConfig) {
             DPopConfig.Disabled -> return null
-            DPopConfig.Default -> DPopConfig.Default.make(context)
-            is DPopConfig.Custom -> cfg
+            DPopConfig.Default -> DPopConfig.Default.make(context).secureArea
+            is DPopConfig.Custom -> cfg.secureArea
+            is DPopConfig.KeyAttested -> cfg.secureArea
         }
         val keyInfo = runCatching {
-            resolvedConfig.secureArea.getKeyInfo(alias)
+            secureArea.getKeyInfo(alias)
         }.getOrNull() ?: return null
         val jwk = JWK.parse(keyInfo.publicKey.toJwk().toString())
         return jwk.computeThumbprint().toString()
@@ -260,10 +268,17 @@ internal class IssuerCreator(
                     DPopConfig.Disabled -> null
                     DPopConfig.Default -> DPopConfig.Default.make(context)
                     is DPopConfig.Custom -> cfg
+                    is DPopConfig.KeyAttested -> DPopConfig.Custom(
+                        secureArea = cfg.secureArea,
+                        createKeySettingsBuilder = {
+                            error("Existing DPoP keys do not require create-key settings")
+                        },
+                        keyUnlockDataProvider = cfg.keyUnlockDataProvider,
+                    )
                 }
                 resolvedConfig?.let { cfg ->
                     SecureAreaDpopSigner.fromExistingKey(cfg, existingDpopKeyAlias, logger).also {
-                        dpopKeyAlias = it.keyInfo.alias
+                        dpopSigner = it
                     }
                 }
             } else {
@@ -275,8 +290,8 @@ internal class IssuerCreator(
                     logger = logger
                 )
                     .onSuccess { signer ->
-                        // Track DPoP key alias for re-issuance metadata
-                        dpopKeyAlias = (signer as SecureAreaDpopSigner).keyInfo.alias
+                        // Track DPoP signer so the final nonce-bound key alias can be stored.
+                        dpopSigner = signer
                     }
                     .getOrElse {
                         logger?.log(
@@ -324,7 +339,7 @@ internal class IssuerCreator(
             logger = logger
         )
             .onSuccess { signer ->
-                dpopKeyAlias = (signer as SecureAreaDpopSigner).keyInfo.alias
+                dpopSigner = signer
             }
             .getOrElse {
                 throw IllegalStateException("Unable to initialize DPoP signer for attested issuance", it)
