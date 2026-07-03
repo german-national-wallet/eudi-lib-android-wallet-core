@@ -113,6 +113,7 @@ internal class IssuerCreator(
         attestationJWT: SignedJWT,
         walletWiaPopSigner: Signer<JWK>,
         credentialConfigurationIdentifiers: List<CredentialConfigurationIdentifier>,
+        existingDpopKeyAlias: String? = null,
     ): Issuer {
         val authorizationServerMetadata = CredentialIssuerId(config.issuerUrl)
             .map { getIssuerMetadata(it).second.first() }
@@ -122,7 +123,8 @@ internal class IssuerCreator(
             config = config.toOpenId4VCIConfigWithAttestation(
                 authorizationServerMetadata,
                 attestationJWT,
-                walletWiaPopSigner
+                walletWiaPopSigner,
+                existingDpopKeyAlias,
             ),
             credentialIssuerId = CredentialIssuerId(config.issuerUrl).getOrThrow(),
             credentialConfigurationIdentifiers = credentialConfigurationIdentifiers,
@@ -317,6 +319,7 @@ internal class IssuerCreator(
         authorizationServerMetadata: CIAuthorizationServerMetadata,
         attestationJWT: SignedJWT,
         walletWiaPopSigner: Signer<JWK>,
+        existingDpopKeyAlias: String? = null,
     ): OpenId4VCIConfig {
         val clientAttestationJWT = ClientAttestationJWT(attestationJWT)
 
@@ -332,18 +335,40 @@ internal class IssuerCreator(
         // processing relies on these fields for metadata/re-issuance handling.
         clientAuthentication = attestationBasedClientAuthentication
 
-        val dpopSigner = DPopSigner.makeIfSupported(
-            context = context,
-            config = dpopConfig,
-            authorizationServerMetadata = authorizationServerMetadata,
-            logger = logger
-        )
-            .onSuccess { signer ->
-                dpopSigner = signer
+        val dpopSigner = if (existingDpopKeyAlias != null) {
+            // Re-issuance: reuse the existing DPoP key bound to the access token (same handling
+            // as the non-attested toOpenId4VCIConfig path).
+            val resolvedConfig = when (val cfg = dpopConfig) {
+                DPopConfig.Disabled -> null
+                DPopConfig.Default -> DPopConfig.Default.make(context)
+                is DPopConfig.Custom -> cfg
+                is DPopConfig.KeyAttested -> DPopConfig.Custom(
+                    secureArea = cfg.secureArea,
+                    createKeySettingsBuilder = {
+                        error("Existing DPoP keys do not require create-key settings")
+                    },
+                    keyUnlockDataProvider = cfg.keyUnlockDataProvider,
+                )
             }
-            .getOrElse {
-                throw IllegalStateException("Unable to initialize DPoP signer for attested issuance", it)
-            }
+            resolvedConfig?.let { cfg ->
+                SecureAreaDpopSigner.fromExistingKey(cfg, existingDpopKeyAlias, logger).also {
+                    dpopSigner = it
+                }
+            } ?: throw IllegalStateException("Unable to reuse existing DPoP key for attested re-issuance")
+        } else {
+            DPopSigner.makeIfSupported(
+                context = context,
+                config = dpopConfig,
+                authorizationServerMetadata = authorizationServerMetadata,
+                logger = logger
+            )
+                .onSuccess { signer ->
+                    dpopSigner = signer
+                }
+                .getOrElse {
+                    throw IllegalStateException("Unable to initialize DPoP signer for attested issuance", it)
+                }
+        }
 
         return OpenId4VCIConfig(
             clientAuthentication = attestationBasedClientAuthentication,
