@@ -62,7 +62,10 @@ class ProcessedDcqlRequest(
     private val documentManager: DocumentManager,
     private val queryMap: RequestedDocumentsByQueryId,
     val msoMdocNonce: String,
-) : RequestProcessor.ProcessedRequest.Success(RequestedDocuments(queryMap.flatMap { it.value.requestedDocuments })) {
+) : RequestProcessor.ProcessedRequest.Success(
+    // As long as we do not support user selection when multiple documents match, we take only the first one
+    RequestedDocuments(queryMap.mapNotNull { it.value.requestedDocuments.firstOrNull() })
+) {
     /**
      * Generates an OpenID4VP response with verifiable presentations for the selected documents.
      *
