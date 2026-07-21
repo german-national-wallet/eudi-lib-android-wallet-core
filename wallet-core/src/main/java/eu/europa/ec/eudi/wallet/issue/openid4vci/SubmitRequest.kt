@@ -58,8 +58,21 @@ internal class SubmitRequest(
         offeredDocument: Offer.OfferedDocument,
         keyUnlockData: Map<KeyAlias, KeyUnlockData?>? = null,
     ): ResponseResult<SubmissionOutcome> {
-        val payload =
+        // If the token endpoint returned authorization_details with credential
+        // identifiers for the requested configuration, the openid4vci submodule
+        // requires an IdentifierBased payload (see RequestIssuanceImpl.validateRequestPayload).
+        // Otherwise fall back to ConfigurationBased.
+        val credentialIdentifier = authorizedRequest.credentialIdentifiers
+            ?.get(offeredDocument.configurationIdentifier)
+            ?.firstOrNull()
+        val payload = if (credentialIdentifier != null) {
+            IssuanceRequestPayload.IdentifierBased(
+                credentialConfigurationIdentifier = offeredDocument.configurationIdentifier,
+                credentialIdentifier = credentialIdentifier,
+            )
+        } else {
             IssuanceRequestPayload.ConfigurationBased(offeredDocument.configurationIdentifier)
+        }
         val signers = unsignedDocument.getPoPSigners().toList()
 
         val (updatedAuthorizedRequest, outcome) = when (config.clientAuthenticationType) {
