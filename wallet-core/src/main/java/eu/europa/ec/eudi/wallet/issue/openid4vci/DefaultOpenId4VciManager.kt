@@ -51,6 +51,7 @@ import eu.europa.ec.eudi.wallet.issue.openid4vci.dpop.DPopConfig
 import eu.europa.ec.eudi.wallet.issue.openid4vci.reissue.IssuanceMetadata
 import eu.europa.ec.eudi.wallet.issue.openid4vci.reissue.ReissuanceAuthorizationException
 import eu.europa.ec.eudi.wallet.issue.openid4vci.reissue.ReissuanceIssuer
+import eu.europa.ec.eudi.wallet.issue.openid4vci.reissue.updateStoredTokens
 import eu.europa.ec.eudi.wallet.logging.Logger
 import eu.europa.ec.eudi.wallet.provider.WalletAttestationsProvider
 import eu.europa.ec.eudi.wallet.provider.WalletKeyManager
@@ -538,6 +539,15 @@ internal class DefaultOpenId4VciManager(
                 issuerAuthorization.authorize(issuer, null)
             }
 
+            //  The refresh may have rotated the token, invalidating the copy in storage, and
+            //  anything below here can still fail. Persist now or a failure strands the document
+            //  on a consumed refresh token (WD-3753).
+            persistRefreshedTokens(
+                documentId = documentId,
+                consumedRefreshToken = issuanceMetadata.refreshToken,
+                refreshed = updatedAuthorizedRequest,
+            )
+
             val offer = Offer(issuer.credentialOffer)
 
             //  Create a new UnsignedDocument (fresh keys) via DocumentCreator
@@ -637,6 +647,28 @@ internal class DefaultOpenId4VciManager(
             val exception = result.outcome.exceptionOrNull() ?: return@any false
             exception is CredentialIssuanceError.InvalidToken
                 || exception.message?.contains("401 Unauthorized") == true
+        }
+    }
+
+    /**
+     * Best effort: a storage failure is logged and does not abort the re-issuance, which can still
+     * succeed and write fresh metadata for the new document.
+     */
+    private suspend fun persistRefreshedTokens(
+        documentId: DocumentId,
+        consumedRefreshToken: String?,
+        refreshed: AuthorizedRequest,
+    ) {
+        runCatching {
+            issuanceMetadataStorage.updateStoredTokens(
+                documentId = documentId,
+                consumedRefreshToken = consumedRefreshToken,
+                refreshed = refreshed,
+            )
+        }.onSuccess { updatedIds ->
+            logger?.d(TAG, "Updated stored tokens after refresh for documents: $updatedIds")
+        }.onFailure { error ->
+            logger?.e(TAG, "Failed to persist refreshed tokens for document $documentId", error)
         }
     }
 
