@@ -22,6 +22,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logging
+import io.ktor.client.plugins.plugin
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
 
@@ -41,6 +42,8 @@ internal fun (() -> HttpClient).wrappedWithLogging(libraryLogger: Logger?): (() 
                 }
             }
             this().let { client ->
+                val isLoggingInstalled = runCatching { client.plugin(Logging) }.isSuccess
+                if (isLoggingInstalled) return@let client
                 client.config {
                     install(Logging) {
                         logger = ktorLogger
