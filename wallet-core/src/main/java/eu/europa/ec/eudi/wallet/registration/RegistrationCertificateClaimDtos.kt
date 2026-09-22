@@ -17,6 +17,10 @@ package eu.europa.ec.eudi.wallet.registration
 
 import android.annotation.SuppressLint
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonTransformingSerializer
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -35,6 +39,47 @@ internal data class MultiLangDto(
     val value: String? = null,
 ) {
     val text: String get() = content ?: value ?: ""
+}
+
+/**
+ * Reads a multi-language registration certificate claim - `srv_description`, `purpose` - without
+ * ever failing the certificate over its shape.
+ *
+ * Two reasons this cannot be a plain `List<MultiLangDto>`:
+ *
+ * 1. **The shape is not settled.** ETSI TS 119 475 / the EUDI TS5 profile describe
+ *    `srv_description` in prose as "an array of arrays with localised descriptions" while giving its
+ *    data type as "array of MultiLangString objects" in the same document, and `purpose` only as the
+ *    latter. Issuers follow both readings: the EUDI playground sends `srv_description` nested and
+ *    `purpose` flat, in one certificate. Committing to either shape rejects the issuers that chose
+ *    the other, so both are accepted and a nested array is flattened.
+ * 2. **Nothing decides anything on these claims.** They are display text. The binding check reads
+ *    `identifiers`, over-asking reads `credentials`, revocation reads `status` - none of them touch
+ *    this. A strict decode meant a relying party with an authentic, trusted, in-scope certificate
+ *    was refused outright as [RegistrationFailureReason.MALFORMED] because a description it never
+ *    even showed was one array deep. Anything unreadable here is therefore dropped rather than
+ *    raised: an empty description is a cosmetic loss, a false rejection is not.
+ *
+ * Entries that are not objects, or that carry no `lang`, are skipped individually, so one bad entry
+ * does not cost the rest.
+ */
+internal object MultiLangListSerializer :
+    JsonTransformingSerializer<List<MultiLangDto>>(ListSerializer(MultiLangDto.serializer())) {
+
+    override fun transformDeserialize(element: JsonElement): JsonElement {
+        val entries = (element as? JsonArray) ?: return JsonArray(emptyList())
+        // One level of nesting is unwrapped; each element is either an entry or a list of entries.
+        return JsonArray(entries.flatMap { it.asEntries() }.filter { it.isUsableEntry() })
+    }
+
+    private fun JsonElement.asEntries(): List<JsonElement> = when (this) {
+        is JsonArray -> this
+        else -> listOf(this)
+    }
+
+    /** A `lang` is mandatory on a MultiLangString and is the one field with no sane default. */
+    private fun JsonElement.isUsableEntry(): Boolean =
+        this is JsonObject && (this["lang"] as? JsonPrimitive)?.isString == true
 }
 
 @SuppressLint("UnsafeOptInUsageError")
