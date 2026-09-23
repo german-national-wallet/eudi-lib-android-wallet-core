@@ -295,25 +295,43 @@ class OpenId4VpManager(
                 logger?.d(TAG, "User rejected the request. Dispatching error.")
 
                 // Dispatch openid4vp NegativeConsensus case
-                val outcome = openId4Vp.dispatch(
+                // Every outcome is reported, the way sendResponse does: a caller waiting on these
+                // events has no other way to learn the dispatch is over, and a silent branch here
+                // leaves it waiting for its own timeout on a request that already came back.
+                when (val outcome = openId4Vp.dispatch(
                     request = request,
                     consensus = Consensus.NegativeConsensus,
                     encryptionParameters = encParams
-                )
+                )) {
+                    is DispatchOutcome.VerifierResponse.Accepted -> {
+                        logger?.d(TAG, "Rejection accepted by verifier.")
 
-                if (outcome is DispatchOutcome.VerifierResponse.Accepted) {
-                    logger?.d(TAG, "Rejection accepted by verifier.")
+                        when (val redirectUri = outcome.redirectURI) {
+                            // Verifier just said OK
+                            null -> transferEventListeners.onTransferEvent(TransferEvent.ResponseSent)
+                            // Verifier wants us to redirect
+                            else -> transferEventListeners.onTransferEvent(
+                                TransferEvent.Redirect(redirectUri)
+                            )
+                        }
+                    }
 
-                    val redirectUri = outcome.redirectURI
-                    if (redirectUri != null) {
-                        // Verifier wants us to redirect
-                        transferEventListeners.onTransferEvent(TransferEvent.Redirect(redirectUri))
-                    } else {
-                        // Verifier just said OK
+                    DispatchOutcome.VerifierResponse.Rejected -> {
+                        // The refusal reached the verifier and it answered with an error. Nothing
+                        // more can be sent - the user has declined and no data was disclosed - so
+                        // this only tells the caller to stop waiting.
+                        logger?.e(TAG, "Verifier rejected the rejection response")
+                        transferEventListeners.onTransferEvent(
+                            TransferEvent.Error(
+                                IllegalStateException("Verifier rejected the response")
+                            )
+                        )
+                    }
+
+                    is DispatchOutcome.RedirectURI -> {
+                        logger?.d(TAG, "Verifier respond with RedirectURI: ${outcome.value}")
                         transferEventListeners.onTransferEvent(TransferEvent.ResponseSent)
                     }
-                } else {
-                    logger?.d(TAG, "Outcome is $outcome")
                 }
 
                 activeRequestObject = null
