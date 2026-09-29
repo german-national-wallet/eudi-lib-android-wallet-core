@@ -180,8 +180,8 @@ internal class SubmitRequest(
         unlockResume: suspend (Map<String, KeyUnlockData?>) -> ResponseResult<SubmissionOutcome>,
     ): Pair<AuthorizedRequest, SubmissionOutcome> {
         val proofSigner = PlainProofSigner(signers, keyUnlockData)
-        val proofsSpecification = ProofSpecification.JwtProofWithoutKeyAttestation(
-            proofSigners = proofSigner.asSigners()
+        val proofsSpecification = ProofSpecification.JwtProofsWithoutKeyAttestation(
+            proofSigner = proofSigner.asBatchSigner()
         )
         try {
             return with(issuer) { request(payload, proofsSpecification) }.getOrThrow()
@@ -214,7 +214,7 @@ internal class SubmitRequest(
             "WalletKeyAttestationProvider is required for JWT proof with key attestation"
         }
         var proofSigner: KeyAttestationSigner? = null
-        val proofsSpecification = ProofSpecification.JwtProof(
+        val proofsSpecification = ProofSpecification.JwtProofWithKeyAttestation(
             proofSignerProvider = { nonce, _ ->
                 val factory = KeyAttestationSigner.Factory(
                     signers, walletKeyAttestationProvider, keyUnlockData
