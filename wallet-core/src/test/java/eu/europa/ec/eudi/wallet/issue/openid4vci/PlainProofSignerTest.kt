@@ -61,25 +61,25 @@ class PlainProofSignerTest {
         (0 until n).map { Crypto.createEcPrivateKey(EcCurve.P256).publicKey }
 
     @Test
-    fun `produces one signer per binding key, each carrying its own public key as a jwk`() =
+    fun `produces one sign operation per binding key, each carrying its own public key as a jwk`() =
         runTest {
             val publicKeys = keys(3)
             val subject = PlainProofSigner(
                 publicKeys.mapIndexed { i, key -> popSigner("alias-$i", key) }
             )
 
-            val signers = subject.asSigners()
+            val operations = subject.asBatchSigner().authenticate().operations
 
-            assertEquals(3, signers.size, "one proof signer per credential-binding key")
-            signers.forEachIndexed { i, signer ->
-                val bindingKey = signer.acquire().publicMaterial
+            assertEquals(3, operations.size, "one sign operation per credential-binding key")
+            operations.forEachIndexed { i, operation ->
+                val bindingKey = operation.publicMaterial
                 // A plain JWT proof identifies the key by value in the `jwk` header, as opposed to
                 // by index into a key attestation's attested_keys.
                 assertIs<JwtBindingKey.Jwk>(bindingKey)
                 assertEquals(
                     JWK.parse(publicKeys[i].toJwk().toString()),
                     bindingKey.jwk,
-                    "signer $i must expose its own public key",
+                    "operation $i must expose its own public key",
                 )
             }
         }
@@ -96,9 +96,9 @@ class PlainProofSignerTest {
         )
         assertNull(subject.keyLockedException)
 
-        val lockedSigner = subject.asSigners()[2]
+        val lockedOperation = subject.asBatchSigner().authenticate().operations[2]
         assertFailsWith<KeyLockedException> {
-            lockedSigner.acquire().function.sign(byteArrayOf(1, 2, 3))
+            lockedOperation.function.sign(byteArrayOf(1, 2, 3))
         }
 
         assertNotNull(

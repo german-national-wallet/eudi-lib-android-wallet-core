@@ -17,24 +17,25 @@
 package eu.europa.ec.eudi.wallet.issue.openid4vci
 
 import com.nimbusds.jose.jwk.JWK
+import eu.europa.ec.eudi.openid4vci.BatchSignOperation
+import eu.europa.ec.eudi.openid4vci.BatchSigner
 import eu.europa.ec.eudi.openid4vci.JwtBindingKey
 import eu.europa.ec.eudi.openid4vci.SignOperation
-import eu.europa.ec.eudi.openid4vci.Signer
 import eu.europa.ec.eudi.wallet.document.credential.ProofOfPossessionSigner
 import kotlinx.coroutines.runBlocking
 import org.multipaz.securearea.KeyLockedException
 import org.multipaz.securearea.KeyUnlockData
 
 /**
- * Produces one plain JWT proof signer per credential-binding key, i.e. proofs whose JOSE header
- * carries the public key as `jwk` and no key attestation.
+ * Produces a [BatchSigner] with one sign operation per credential-binding key, for plain JWT
+ * proofs whose JOSE header carries the public key as `jwk` and no key attestation.
  *
- * FORK ADDITION -- replaces the `BatchProofSigner` that wallet-core had up to v0.28.1 and that was
- * dropped when openid4vci v0.12.0 removed plain JWT proofs. It is used only for issuers that
- * advertise a `jwt` proof type without `key_attestations_required`; see [SubmitRequest].
+ * FORK ADDITION -- used only for issuers that advertise a `jwt` proof type without
+ * `key_attestations_required`; see [SubmitRequest].
  *
- * All signers share this instance's [keyLockedException] so that a locked key surfaced by any of
- * them can be turned into a single [UserAuthRequiredException] covering every key in the batch.
+ * All sign operations share this instance's [keyLockedException] so that a locked key surfaced by
+ * any of them can be turned into a single [UserAuthRequiredException] covering every key in the
+ * batch.
  */
 class PlainProofSigner(
     val signers: List<ProofOfPossessionSigner>,
@@ -54,32 +55,31 @@ class PlainProofSigner(
     var keyLockedException: KeyLockedException? = null
         private set
 
-    fun asSigners(): List<Signer<JwtBindingKey>> = signers.map { SingleKeySigner(it) }
-
-    private inner class SingleKeySigner(
-        private val signer: ProofOfPossessionSigner,
-    ) : Signer<JwtBindingKey> {
+    fun asBatchSigner(): BatchSigner<JwtBindingKey> = object : BatchSigner<JwtBindingKey> {
 
         override val javaAlgorithm: String = this@PlainProofSigner.javaAlgorithm
 
-        override suspend fun acquire(): SignOperation<JwtBindingKey> {
-            val jwk = JWK.parse(signer.getKeyInfo().publicKey.toJwk().toString())
-            val keyUnlockDataForSigner = keyUnlockData?.get(signer.keyAlias)
-            return SignOperation(
-                function = { input ->
-                    try {
-                        signer.signPoP(input, keyUnlockDataForSigner).toDerEncoded()
-                    } catch (e: KeyLockedException) {
-                        keyLockedException = e
-                        throw e
-                    }
-                },
-                publicMaterial = JwtBindingKey.Jwk(jwk),
-            )
-        }
+        override suspend fun authenticate(): BatchSignOperation<JwtBindingKey> =
+            BatchSignOperation(signers.map { it.toSignOperation() })
 
-        override suspend fun release(signOperation: SignOperation<JwtBindingKey>?) {
+        override suspend fun release(signOps: BatchSignOperation<JwtBindingKey>?) {
             // nothing to release
         }
+    }
+
+    private suspend fun ProofOfPossessionSigner.toSignOperation(): SignOperation<JwtBindingKey> {
+        val jwk = JWK.parse(getKeyInfo().publicKey.toJwk().toString())
+        val keyUnlockDataForSigner = keyUnlockData?.get(keyAlias)
+        return SignOperation(
+            function = { input ->
+                try {
+                    signPoP(input, keyUnlockDataForSigner).toDerEncoded()
+                } catch (e: KeyLockedException) {
+                    keyLockedException = e
+                    throw e
+                }
+            },
+            publicMaterial = JwtBindingKey.Jwk(jwk),
+        )
     }
 }
