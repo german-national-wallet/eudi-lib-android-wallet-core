@@ -113,7 +113,7 @@ internal class DefaultOpenId4VciManager(
             ?: IssuerMetadataPolicy.IgnoreSigned
 
     private val offerResolver: OfferResolver by lazy {
-        OfferResolver(config, httpClientFactory, issuerMetadataPolicy)
+        OfferResolver(config, httpClientFactory, issuerMetadataPolicy, logger)
     }
     private val issuerCreator: IssuerCreator by lazy {
         IssuerCreator(context, config, httpClientFactory, walletProvider, walletAttestationKeyManager, logger, issuerMetadataPolicy, issuerRegistrationEnabled, issuerRegistration)
@@ -143,7 +143,7 @@ internal class DefaultOpenId4VciManager(
                 issuer = it,
                 policy = issuerMetadataPolicy
             ).getOrThrow()
-        }
+        }.onFailure { logger?.logIssuerMetadataFailure(TAG, issuerMetadataPolicy, it) }
     }
 
     @Deprecated("Use issueDocumentByConfigurationIdentifiers that accepts a list of identifiers")
