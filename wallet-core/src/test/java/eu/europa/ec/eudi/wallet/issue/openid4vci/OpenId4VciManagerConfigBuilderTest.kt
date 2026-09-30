@@ -16,10 +16,13 @@
 
 package eu.europa.ec.eudi.wallet.issue.openid4vci
 
+import eu.europa.ec.eudi.openid4vci.CertificateChainTrust
 import eu.europa.ec.eudi.openid4vci.CredentialResponseEncryptionPolicy
+import eu.europa.ec.eudi.openid4vci.IssuerMetadataPolicy
 import eu.europa.ec.eudi.wallet.issue.openid4vci.dpop.DPopConfig
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import kotlin.test.Test
 import kotlin.test.assertIs
@@ -104,5 +107,28 @@ class OpenId4VciManagerConfigBuilderTest {
             CredentialResponseEncryptionPolicy.REQUIRED,
             config.responseEncryptionConfig.credentialResponseEncryptionPolicy
         )
+    }
+
+    @Test
+    fun `ConfigBuilder leaves issuerMetadataPolicy unset by default`() {
+        val config = OpenId4VciManager.Config.Builder()
+            .withClientAuthenticationType(OpenId4VciManager.ClientAuthenticationType.None("test-client-id"))
+            .withAuthFlowRedirectionURI("app://redirect")
+            .build()
+
+        assertNull(config.issuerMetadataPolicy)
+    }
+
+    @Test
+    fun `ConfigBuilder sets issuerMetadataPolicy`() {
+        val policy = IssuerMetadataPolicy.RequireSigned(CertificateChainTrust { true })
+
+        val config = OpenId4VciManager.Config.Builder()
+            .withClientAuthenticationType(OpenId4VciManager.ClientAuthenticationType.None("test-client-id"))
+            .withAuthFlowRedirectionURI("app://redirect")
+            .withIssuerMetadataPolicy(policy)
+            .build()
+
+        assertEquals(policy, config.issuerMetadataPolicy)
     }
 }

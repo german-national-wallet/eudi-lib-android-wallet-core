@@ -105,7 +105,9 @@ internal class DefaultOpenId4VciManager(
             .wrappedWithContentNegotiation()
 
     private val issuerMetadataPolicy: IssuerMetadataPolicy
-        get() = issuerTrustConfig?.issuerMetadataPolicy ?: IssuerMetadataPolicy.IgnoreSigned
+        get() = config.issuerMetadataPolicy
+            ?: issuerTrustConfig?.issuerMetadataPolicy
+            ?: IssuerMetadataPolicy.IgnoreSigned
 
     private val offerResolver: OfferResolver by lazy {
         OfferResolver(config, httpClientFactory, issuerMetadataPolicy)

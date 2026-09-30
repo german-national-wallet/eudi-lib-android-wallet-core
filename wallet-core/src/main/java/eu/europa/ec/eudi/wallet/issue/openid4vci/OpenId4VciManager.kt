@@ -28,6 +28,7 @@ import eu.europa.ec.eudi.openid4vci.CredentialResponseEncryptionPolicy
 import eu.europa.ec.eudi.openid4vci.CredentialReusePolicies
 import eu.europa.ec.eudi.openid4vci.EcConfig
 import eu.europa.ec.eudi.openid4vci.EncryptionSupportConfig
+import eu.europa.ec.eudi.openid4vci.IssuerMetadataPolicy
 import eu.europa.ec.eudi.openid4vci.RsaConfig
 import eu.europa.ec.eudi.openid4vci.Signer
 import eu.europa.ec.eudi.wallet.document.DeferredDocument
@@ -613,6 +614,11 @@ interface OpenId4VciManager {
      *
      *           @see EncryptionSupportConfig
      *           @see CredentialResponseEncryptionPolicy
+     * @property issuerMetadataPolicy policy for the credential issuer's signed metadata. When null,
+     *           the policy derived from `configureIssuerTrust` applies (signed metadata is ignored
+     *           when issuer trust is not configured).
+     *
+     *           @see Builder.withIssuerMetadataPolicy
      */
     data class Config @JvmOverloads constructor(
         val clientAuthenticationType: ClientAuthenticationType,
@@ -628,6 +634,7 @@ interface OpenId4VciManager {
         ),
         val supportedCredentialReusePolicies: CredentialReusePolicies? = null,
         val proofTypes: SupportedProofTypes = SupportedProofTypes.Default,
+        val issuerMetadataPolicy: IssuerMetadataPolicy? = null,
     ) {
         /**
          * PAR usage for the OpenId4Vci issuer
@@ -746,6 +753,8 @@ interface OpenId4VciManager {
             var supportedCredentialReusePolicies: CredentialReusePolicies? = null
 
             var proofTypes: SupportedProofTypes = SupportedProofTypes.Default
+
+            var issuerMetadataPolicy: IssuerMetadataPolicy? = null
 
             /**
              * Set the client authentication type
@@ -941,6 +950,23 @@ interface OpenId4VciManager {
             }
 
             /**
+             * Sets the policy for the credential issuer's signed metadata
+             * (`openidvci-issuer-metadata+jwt`), for this issuer only.
+             *
+             * Takes precedence over the policy derived from `configureIssuerTrust`, and applies
+             * to offer resolution, metadata lookup and wallet-initiated issuance alike. Use
+             * [eu.europa.ec.eudi.wallet.trust.X509CertificateChainTrust] to validate the metadata
+             * signing chain against bundled trust anchors.
+             *
+             * @param policy the [IssuerMetadataPolicy] to apply
+             * @return This builder instance for method chaining
+             * @see IssuerMetadataPolicy
+             */
+            fun withIssuerMetadataPolicy(policy: IssuerMetadataPolicy) = apply {
+                this.issuerMetadataPolicy = policy
+            }
+
+            /**
              * Build the [Config]
              * @return the [Config]
              */
@@ -959,6 +985,7 @@ interface OpenId4VciManager {
                     responseEncryptionConfig = responseEncryptionConfig,
                     supportedCredentialReusePolicies = supportedCredentialReusePolicies,
                     proofTypes = proofTypes,
+                    issuerMetadataPolicy = issuerMetadataPolicy,
                 )
             }
         }

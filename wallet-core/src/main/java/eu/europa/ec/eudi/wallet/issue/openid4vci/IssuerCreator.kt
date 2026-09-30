@@ -96,6 +96,16 @@ internal class IssuerCreator(
     private val issuerRegistration: IssuerRegistrationResolver? = null,
 ) {
 
+    // Wallet-initiated issuance re-resolves the metadata with this policy. A policy derived from
+    // issuer trust is only honoured there alongside registration validation, as before; one set
+    // explicitly on the config always is.
+    private val walletInitiatedMetadataPolicy: IssuerMetadataPolicy
+        get() = if (issuerRegistrationEnabled || config.issuerMetadataPolicy != null) {
+            issuerMetadataPolicy
+        } else {
+            IssuerMetadataPolicy.IgnoreSigned
+        }
+
     internal var clientAttestationPopKeyId: String? = null
         private set
 
@@ -398,7 +408,7 @@ internal class IssuerCreator(
             }
         }
 
-        if (issuerRegistrationEnabled && issuerMetadataPolicy !is IssuerMetadataPolicy.RequireSigned) {
+        if (issuerRegistrationEnabled && this@IssuerCreator.issuerMetadataPolicy !is IssuerMetadataPolicy.RequireSigned) {
             logger?.i(
                 TAG,
                 "issuer registration validation is enabled but signed issuer metadata is not " +
@@ -414,7 +424,7 @@ internal class IssuerCreator(
         }
 
         val registrationCertificatePolicy = issuerRegistration
-            ?.takeIf { issuerMetadataPolicy is IssuerMetadataPolicy.RequireSigned }
+            ?.takeIf { this@IssuerCreator.issuerMetadataPolicy is IssuerMetadataPolicy.RequireSigned }
             ?.let { resolver ->
                 issuerRegistrationCertificatePolicy(
                     resolver = resolver,
@@ -437,7 +447,7 @@ internal class IssuerCreator(
                 else -> ParUsage.IfSupported()
             },
             proofs = proofTypes.toProofsConfig(),
-            issuerMetadataPolicy = if (issuerRegistrationEnabled) issuerMetadataPolicy else IssuerMetadataPolicy.IgnoreSigned,
+            issuerMetadataPolicy = walletInitiatedMetadataPolicy,
             registrationCertificatePolicy = registrationCertificatePolicy,
         )
     }
@@ -561,6 +571,7 @@ internal class IssuerCreator(
                 else -> ParUsage.IfSupported()
             },
             proofs = proofTypes.toProofsConfig(),
+            issuerMetadataPolicy = walletInitiatedMetadataPolicy,
         )
     }
 }
