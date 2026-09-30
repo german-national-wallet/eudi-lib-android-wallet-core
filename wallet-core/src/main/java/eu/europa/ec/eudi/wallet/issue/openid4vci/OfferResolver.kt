@@ -24,7 +24,9 @@ import eu.europa.ec.eudi.openid4vci.IssuerMetadataPolicy
 import eu.europa.ec.eudi.openid4vci.JwsAlgorithm
 import eu.europa.ec.eudi.openid4vci.OpenId4VCIConfig
 import eu.europa.ec.eudi.openid4vci.Signer
+import eu.europa.ec.eudi.wallet.issue.openid4vci.OpenId4VciManager.Companion.TAG
 import eu.europa.ec.eudi.wallet.issue.openid4vci.dpop.DPopConfig
+import eu.europa.ec.eudi.wallet.logging.Logger
 import io.ktor.client.HttpClient
 import org.jetbrains.annotations.VisibleForTesting
 import java.net.URI
@@ -35,6 +37,7 @@ internal class OfferResolver(
     private val config: OpenId4VciManager.Config,
     private val ktorHttpClientFactory: () -> HttpClient,
     private val issuerMetadataPolicy: IssuerMetadataPolicy = IssuerMetadataPolicy.IgnoreSigned,
+    private val logger: Logger? = null,
 ) {
 
     private val resolveConfig: OpenId4VCIConfig by lazy {
@@ -111,7 +114,10 @@ internal class OfferResolver(
         }.also { result ->
             result
                 .onSuccess { cache[offerUri] = it }
-                .onFailure { cache.remove(offerUri) }
+                .onFailure {
+                    cache.remove(offerUri)
+                    logger?.logIssuerMetadataFailure(TAG, issuerMetadataPolicy, it)
+                }
         }
     }
 }

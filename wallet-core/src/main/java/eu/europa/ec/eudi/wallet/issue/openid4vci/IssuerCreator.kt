@@ -224,8 +224,13 @@ internal class IssuerCreator(
 
 
     private suspend fun getIssuerMetadata(credentialIssuerId: CredentialIssuerId): Pair<CredentialIssuerMetadata, List<CIAuthorizationServerMetadata>> {
-        return ktorHttpClientFactory().use {
-            Issuer.metaData(it, credentialIssuerId, issuerMetadataPolicy)
+        return try {
+            ktorHttpClientFactory().use {
+                Issuer.metaData(it, credentialIssuerId, issuerMetadataPolicy)
+            }
+        } catch (e: Throwable) {
+            logger?.logIssuerMetadataFailure(TAG, issuerMetadataPolicy, e)
+            throw e
         }
     }
 
@@ -269,6 +274,7 @@ internal class IssuerCreator(
             ).getOrThrow().first
             IssuerCreation(issuer, evaluatedRegistration)
         } catch (e: Throwable) {
+            logger?.logIssuerMetadataFailure(TAG, walletInitiatedMetadataPolicy, e)
             logger?.e(TAG, "Failed to create wallet-initiated issuer", e)
             throw e
         }
