@@ -19,6 +19,7 @@ package eu.europa.ec.eudi.wallet.issue.openid4vci
 import android.content.Context
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jwt.SignedJWT
+import eu.europa.ec.eudi.openid4vci.AttestationBasedClientAuthenticationSpec
 import eu.europa.ec.eudi.openid4vci.AuthorizeIssuanceConfig
 import eu.europa.ec.eudi.openid4vci.CIAuthorizationServerMetadata
 import eu.europa.ec.eudi.openid4vci.ClientAuthentication
@@ -63,6 +64,7 @@ import io.ktor.client.HttpClient
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWK
 import org.multipaz.crypto.Algorithm
+import org.jetbrains.annotations.VisibleForTesting
 import java.net.URI
 import java.time.Clock
 import eu.europa.ec.eudi.openid4vci.DPoPConfig as VciDPoPConfig
@@ -280,7 +282,8 @@ internal class IssuerCreator(
         }
     }
 
-    private suspend fun CIAuthorizationServerMetadata.toClientAuthentication(): Result<ClientAuthentication> =
+    @VisibleForTesting
+    internal suspend fun CIAuthorizationServerMetadata.toClientAuthentication(): Result<ClientAuthentication> =
         runCatching {
             val issuerUrl = this.issuer.value
             when (val type = config.clientAuthenticationType) {
@@ -294,20 +297,58 @@ internal class IssuerCreator(
                         ?: throw IllegalStateException(
                             "Client attestation based authentication is not supported by the authorization server at ${this.authorizationEndpointURI}"
                         )
-                    val supportedAlgorithms = clientAttestationPOPJWSAlgs.map { a ->
-                        Algorithm.fromJoseAlgorithmIdentifier(a.name)
-                    }
-                    walletAttestationKeyManager
-                        .getOrCreateWalletAttestationKey(issuerUrl, supportedAlgorithms)
-                        .map {
-                            clientAttestationPopKeyId = it.keyInfo.alias
-                            with(it) {
-                                walletAttestationsProvider.toClientAuthentication().getOrThrow()
-                            }
-                        }.getOrThrow()
+                    attestationBasedClientAuthentication(issuerUrl, walletAttestationsProvider, clientAttestationPOPJWSAlgs)
                 }
+                is OpenId4VciManager.ClientAuthenticationType.AttestationIfSupported ->
+                    walletInstanceAttestationProvider?.let {
+                        // Decided per issuer creation from the freshly resolved metadata, so a manager
+                        // reused across issuances never carries a stale decision.
+                        //
+                        // Per draft-ietf-oauth-attestation-based-client-auth-11, Section 8
+                        // (https://datatracker.ietf.org/doc/html/draft-ietf-oauth-attestation-based-client-auth-11#section-8)
+                        // the AS SHOULD list `attest_jwt_client_auth` in
+                        // `token_endpoint_auth_methods_supported` and MUST publish
+                        // `client_attestation_pop_signing_alg_values_supported` when it uses the
+                        // Client Attestation PoP JWT. Either signal means attestation is supported.
+                        val advertisedPopAlgs = clientAttestationPOPJWSAlgs.orEmpty()
+                        val advertisesAuthMethod = tokenEndpointAuthMethods.orEmpty().any {
+                            it.value == AttestationBasedClientAuthenticationSpec.ATTESTATION_JWT_CLIENT_AUTHENTICATION_METHOD
+                        }
+                        if (advertisesAuthMethod || advertisedPopAlgs.isNotEmpty()) {
+                            // Only the auth method advertised: fall back to ES256, the algorithm
+                            // HAIP 1.0 mandates for all parties.
+                            val popAlgs = advertisedPopAlgs.ifEmpty { listOf(JWSAlgorithm.ES256) }
+                            attestationBasedClientAuthentication(
+                                issuerUrl = issuerUrl,
+                                walletAttestationsProvider = it,
+                                clientAttestationPOPJWSAlgs = popAlgs
+                            )
+                        } else {
+                            null
+                        }
+                    } ?: ClientAuthentication.None(type.clientId).also {
+                        clientAttestationPopKeyId = null
+                    }
             }
         }
+
+    private suspend fun attestationBasedClientAuthentication(
+        issuerUrl: String,
+        walletAttestationsProvider: WalletInstanceAttestationProvider,
+        clientAttestationPOPJWSAlgs: List<JWSAlgorithm>,
+    ): ClientAuthentication {
+        val supportedAlgorithms = clientAttestationPOPJWSAlgs.map { a ->
+            Algorithm.fromJoseAlgorithmIdentifier(a.name)
+        }
+        return walletAttestationKeyManager
+            .getOrCreateWalletAttestationKey(issuerUrl, supportedAlgorithms)
+            .map {
+                clientAttestationPopKeyId = it.keyInfo.alias
+                with(it) {
+                    walletAttestationsProvider.toClientAuthentication().getOrThrow()
+                }
+            }.getOrThrow()
+    }
 
     /**
      * Converts the [OpenId4VciManager.Config] to [OpenId4VCIConfig].

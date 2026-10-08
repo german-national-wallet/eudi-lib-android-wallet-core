@@ -396,6 +396,21 @@ interface OpenId4VciManager {
          * @param clientId the client id
          */
         data class AttestationBased(val clientId: String) : ClientAuthenticationType
+
+        /**
+         * Attestation based client authentication when the authorization server supports it,
+         * otherwise no client authentication.
+         *
+         * Decided each time an issuer is created, from the resolved authorization server
+         * metadata: the wallet instance attestation is sent only if a
+         * [WalletInstanceAttestationProvider] is available and the server advertises either
+         * `attest_jwt_client_auth` in `token_endpoint_auth_methods_supported` or a non-empty
+         * `client_attestation_pop_signing_alg_values_supported`; otherwise this behaves like
+         * [None]. See
+         * [draft-ietf-oauth-attestation-based-client-auth-11, Section 8](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-attestation-based-client-auth-11#section-8).
+         * @param clientId the client id, used as is when no attestation is sent
+         */
+        data class AttestationIfSupported(val clientId: String) : ClientAuthenticationType
     }
 
     /**
@@ -762,6 +777,8 @@ interface OpenId4VciManager {
              * Can be either:
              *  - [ClientAuthenticationType.None] provided a client id
              *  - [ClientAuthenticationType.AttestationBased] using [WalletAttestationsProvider]
+             *  - [ClientAuthenticationType.AttestationIfSupported] attestation only when the
+             *    authorization server supports it
              *
              * @param clientAuthenticationType the client authentication
              * @return this builder
