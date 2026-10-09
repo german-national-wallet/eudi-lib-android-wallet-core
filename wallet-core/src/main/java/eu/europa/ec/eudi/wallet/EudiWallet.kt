@@ -454,6 +454,7 @@ interface EudiWallet : DocumentManager, PresentationManager, DocumentStatusResol
                             certificates,
                             profileValidation = { _, _ -> true },
                             revocationPolicy = config.revocationPolicy,
+                            revocationCheckTimeout = config.revocationCheckTimeout,
                         )
                     }
                 })?.also {
@@ -493,6 +494,7 @@ interface EudiWallet : DocumentManager, PresentationManager, DocumentStatusResol
                                     it,
                                     profileValidation = { _, _ -> true },
                                     revocationPolicy = config.revocationPolicy,
+                                    revocationCheckTimeout = config.revocationCheckTimeout,
                                 ).asCertificateTrust()
                             }
                     }

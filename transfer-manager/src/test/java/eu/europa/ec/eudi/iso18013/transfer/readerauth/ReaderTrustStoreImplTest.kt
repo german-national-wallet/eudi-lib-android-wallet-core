@@ -21,6 +21,8 @@ import eu.europa.ec.eudi.iso18013.transfer.mockAndroidLog
 import eu.europa.ec.eudi.iso18013.transfer.readerauth.profile.ProfileValidation
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
 import io.mockk.verify
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.junit.After
@@ -38,9 +40,13 @@ import java.security.cert.PKIXRevocationChecker
 import java.security.cert.TrustAnchor
 import java.security.cert.X509Certificate
 import java.util.Date
+import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.nanoseconds
+import kotlin.time.Duration.Companion.seconds
 
 class ReaderTrustStoreImplTest {
 
@@ -229,6 +235,39 @@ class ReaderTrustStoreImplTest {
         // PKIXRevocationChecker should reject the certificate because it's in the CRL
         assertFailsWith<CertPathValidatorException> {
             validator.validate(certPath, params)
+        }
+    }
+
+    @Test
+    fun testValidationFailsWhenItExceedsTheTimeout() {
+        // Stands in for a CRL download that never completes, which the JVM PKIX provider
+        // does not attempt by default.
+        val hangingValidator = mockk<CertPathValidator>()
+        every { hangingValidator.validate(any(), any()) } answers {
+            Thread.sleep(10_000)
+            error("unreachable")
+        }
+        mockkStatic(CertPathValidator::class)
+        every { CertPathValidator.getInstance("PKIX") } returns hangingValidator
+        try {
+            val logged = mutableListOf<String>()
+            val trustStore = ReaderTrustStoreImpl(
+                trustedCertificates = listOf(rootCertificate),
+                profileValidation = mockk(),
+                errorLogger = { _, message, _ -> logged += message },
+                revocationPolicy = RevocationPolicy.NoCheck,
+                revocationCheckTimeout = 500.milliseconds,
+            )
+
+            val start = System.nanoTime()
+            val result = trustStore.validateCertificationTrustPath(listOf(leafCertificate, rootCertificate))
+            val elapsed = (System.nanoTime() - start).nanoseconds
+
+            assertFalse(result, "Validation should fail once the timeout elapses")
+            assertTrue(elapsed < 5.seconds, "validation took $elapsed")
+            assertEquals(listOf("CERTIFICATE_PATH_TIMEOUT"), logged)
+        } finally {
+            unmockkStatic(CertPathValidator::class)
         }
     }
 

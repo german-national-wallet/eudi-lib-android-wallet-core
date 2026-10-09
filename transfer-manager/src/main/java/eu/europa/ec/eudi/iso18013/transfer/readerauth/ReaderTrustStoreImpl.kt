@@ -33,6 +33,12 @@ import java.security.cert.PKIXRevocationChecker
 import java.security.cert.TrustAnchor
 import java.security.cert.X509Certificate
 import java.util.Date
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 class ReaderTrustStoreImpl(
     private val trustedCertificates: List<X509Certificate>,
@@ -41,6 +47,7 @@ class ReaderTrustStoreImpl(
         Log.d(tag, message, cause)
     },
     private val revocationPolicy: RevocationPolicy = RevocationPolicy.HardFail,
+    private val revocationCheckTimeout: Duration = DEFAULT_REVOCATION_CHECK_TIMEOUT,
 ) : ReaderTrustStore {
 
     private val trustedCertMap: Map<X500Name, X509Certificate> by lazy {
@@ -112,8 +119,18 @@ class ReaderTrustStoreImpl(
 
             val certPath = CertificateFactory.getInstance("X.509")
                 .generateCertPath(chainToDocumentSigner)
-            val certPathValidationResult = validator
-                .validate(certPath, params) as PKIXCertPathValidatorResult
+            // The platform fetches CRLs without a timeout, so bound the path validation.
+            val validation = validationExecutor.submit<PKIXCertPathValidatorResult> {
+                validator.validate(certPath, params) as PKIXCertPathValidatorResult
+            }
+            val certPathValidationResult = try {
+                validation.get(revocationCheckTimeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)
+            } catch (e: ExecutionException) {
+                throw e.cause ?: e
+            } catch (e: TimeoutException) {
+                validation.cancel(true)
+                throw e
+            }
             val trustedRootCA = certPathValidationResult.trustAnchor.trustedCert
 
             profileValidation.validate(chainToDocumentSigner, trustedRootCA)
@@ -124,6 +141,7 @@ class ReaderTrustStoreImpl(
                 is NoSuchAlgorithmException -> errorLogger(TAG, "NO_SUCH_ALGORITHM", e)
                 is CertificateException -> errorLogger(TAG, "CERTIFICATE_ERROR", e)
                 is CertPathValidatorException -> errorLogger(TAG, "CERTIFICATE_PATH_ERROR", e)
+                is TimeoutException -> errorLogger(TAG, "CERTIFICATE_PATH_TIMEOUT", e)
                 else -> errorLogger(TAG, "UNKNOWN_ERROR", e)
             }
             false
@@ -132,5 +150,12 @@ class ReaderTrustStoreImpl(
 
     companion object {
         private const val TAG = "ReaderTrustStoreImpl"
+
+        /** Upper bound for the PKIX path validation, including any CRL download. */
+        val DEFAULT_REVOCATION_CHECK_TIMEOUT: Duration = 10.seconds
+
+        private val validationExecutor = Executors.newCachedThreadPool { runnable ->
+            Thread(runnable, "ReaderTrustStore-validation").apply { isDaemon = true }
+        }
     }
 }
