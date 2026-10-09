@@ -447,7 +447,11 @@ interface EudiWallet : DocumentManager, PresentationManager, DocumentStatusResol
             // --- Build ReaderAuthPolicy (single policy for both transports) ---
             val readerAuthPolicy: ReaderAuthPolicy = ReaderAuthenticationConfigBuilder()
                 .apply(config.readerAuthenticationBlock ?: {})
-                .build(etsiSource = etsiSource, logger = loggerToUse)
+                .build(
+                    etsiSource = etsiSource,
+                    logger = loggerToUse,
+                    revocationCheckTimeout = config.revocationCheckTimeout,
+                )
 
             // Derive trust store for components not yet migrated to ReaderAuthPolicy
             val readerTrustStoreToUse = readerAuthPolicy.readerTrustStore?.also {

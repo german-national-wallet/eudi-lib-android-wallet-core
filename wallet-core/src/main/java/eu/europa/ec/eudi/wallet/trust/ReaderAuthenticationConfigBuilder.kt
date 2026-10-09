@@ -26,6 +26,7 @@ import eu.europa.ec.eudi.wallet.internal.getCertificate
 import eu.europa.ec.eudi.wallet.logging.Logger
 import java.security.cert.TrustAnchor
 import java.security.cert.X509Certificate
+import kotlin.time.Duration
 
 /**
  * DSL builder for unified reader authentication configuration.
@@ -113,6 +114,7 @@ class ReaderAuthenticationConfigBuilder {
      *
      * @param etsiSource the centrally configured ETSI trust source (may be null)
      * @param logger the wallet logger for diagnostic output
+     * @param revocationCheckTimeout the upper bound for a trust path validation against [trustedCertificates]
      * @return the resolved [ReaderAuthPolicy]
      * @throws IllegalArgumentException if [enforceIfPresent] or [alwaysRequire] is set
      *   but no trust source is available
@@ -120,6 +122,7 @@ class ReaderAuthenticationConfigBuilder {
     internal fun build(
         etsiSource: IsChainTrustedForEUDIW<List<X509Certificate>, TrustAnchor>?,
         logger: Logger,
+        revocationCheckTimeout: Duration = ReaderTrustStoreImpl.DEFAULT_REVOCATION_CHECK_TIMEOUT,
     ): ReaderAuthPolicy {
         val trustStore: ReaderTrustStore? = when {
             customTrustStore != null -> customTrustStore
@@ -128,6 +131,7 @@ class ReaderAuthenticationConfigBuilder {
                 certificates!!,
                 profileValidation = { _, _ -> true },
                 revocationPolicy = revocationPolicy,
+                revocationCheckTimeout = revocationCheckTimeout,
             )
             etsiSource != null -> etsiSource.asReaderTrustStore()
             else -> null

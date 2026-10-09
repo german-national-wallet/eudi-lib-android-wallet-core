@@ -86,12 +86,14 @@ internal data class RegistrationTrust(
             certificateTrust = registrationCertificateTrust(
                 trustedCertificates = config.wrpRegistrationTrustedCertificates,
                 revocationPolicy = config.wrpRegistrationRevocationPolicy,
+                revocationCheckTimeout = config.revocationCheckTimeout,
                 etsiSource = etsiSource,
                 logger = logger
             ),
             statusTrust = registrationStatusTrust(
                 statusListTrustedCertificates = config.wrpRegistrationStatusListTrustedCertificates,
                 revocationPolicy = config.wrpRegistrationRevocationPolicy,
+                revocationCheckTimeout = config.revocationCheckTimeout,
                 etsiSource = etsiSource,
                 logger = logger
             ),
@@ -109,12 +111,14 @@ internal data class RegistrationTrust(
             certificateTrust = registrationCertificateTrust(
                 trustedCertificates = config.issuerRegistrationTrustedCertificates,
                 revocationPolicy = config.issuerRegistrationRevocationPolicy,
+                revocationCheckTimeout = config.revocationCheckTimeout,
                 etsiSource = etsiSource,
                 logger = logger
             ),
             statusTrust = registrationStatusTrust(
                 statusListTrustedCertificates = config.issuerRegistrationStatusListTrustedCertificates,
                 revocationPolicy = config.issuerRegistrationRevocationPolicy,
+                revocationCheckTimeout = config.revocationCheckTimeout,
                 etsiSource = etsiSource,
                 logger = logger
             ),
