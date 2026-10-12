@@ -44,6 +44,7 @@ internal class OfferResolver(
         val clientId = when (val type = config.clientAuthenticationType) {
             is OpenId4VciManager.ClientAuthenticationType.None -> type.clientId
             is OpenId4VciManager.ClientAuthenticationType.AttestationBased -> type.clientId
+            is OpenId4VciManager.ClientAuthenticationType.AttestationIfSupported -> type.clientId
         }
         val dPoPUsage = when (val dpop = config.dpopConfig) {
             DPopConfig.Disabled -> DPoPUsage.Never
