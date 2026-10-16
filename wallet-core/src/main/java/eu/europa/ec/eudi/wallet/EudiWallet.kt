@@ -464,7 +464,8 @@ interface EudiWallet : DocumentManager, PresentationManager, DocumentStatusResol
             // Registration certificate handling shared by every transport: the wallet authenticates
             // and evaluates the certificate on the proximity and DC-API paths, and supplies the same
             // evaluation to the OpenID4VP library through a RegistrationCertificatePolicy on the remote
-            // path. The trust store for the signer chain follows the same precedence as reader
+            // path. Explicitly configured registration certificate anchors take precedence; otherwise
+            // the trust store for the signer chain follows the same precedence as reader
             // authentication trust (see readerTrustStoreToUse): an explicitly supplied reader trust
             // store, then the ETSI Trusted Lists (registration certificate context) when ETSI reader
             // trust is enabled, then the statically configured certificates. As with reader
@@ -479,7 +480,17 @@ interface EudiWallet : DocumentManager, PresentationManager, DocumentStatusResol
                 registrationCertificatePolicy = null
                 resolvedRegistration = null
             } else {
-                val certificateTrust: CertificateTrust? = (readerTrustStore ?: config.readerTrustStore)
+                val certificateTrust: CertificateTrust? = config.registrationTrustedCertificates
+                    ?.takeIf { it.isNotEmpty() }
+                    ?.let {
+                        ReaderTrustStoreImpl(
+                            it,
+                            profileValidation = { _, _ -> true },
+                            revocationPolicy = config.registrationRevocationPolicy,
+                            revocationCheckTimeout = config.revocationCheckTimeout,
+                        ).asCertificateTrust()
+                    }
+                    ?: (readerTrustStore ?: config.readerTrustStore)
                     ?.asCertificateTrust()
                     ?: if (config.useEtsiReaderTrust && etsiSource != null) {
                         etsiSource.asCertificateTrust(

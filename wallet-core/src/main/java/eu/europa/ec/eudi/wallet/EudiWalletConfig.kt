@@ -600,6 +600,58 @@ class EudiWalletConfig {
     }
 
     /**
+     * The certificates that anchor the signer chain of a relying party's registration certificate,
+     * kept apart from [readerTrustedCertificates] so that an access certificate authority cannot vouch
+     * for a registration certificate, nor a registrar for an access certificate.
+     *
+     * When set, they take precedence over every other source of registration certificate trust.
+     *
+     * @see configureRegistrationCertificateTrustStore
+     */
+    var registrationTrustedCertificates: List<X509Certificate>? = null
+        private set
+
+    /**
+     * The certificate revocation checking policy for [registrationTrustedCertificates]. The default
+     * is [RevocationPolicy.HardFail].
+     */
+    var registrationRevocationPolicy: RevocationPolicy = RevocationPolicy.HardFail
+        private set
+
+    /**
+     * Configure [registrationTrustedCertificates].
+     *
+     * @param registrationTrustedCertificates the registration certificate signer trust anchors
+     * @param revocationPolicy the certificate revocation checking policy (default [RevocationPolicy.HardFail])
+     * @return the [EudiWalletConfig] instance
+     */
+    @JvmOverloads
+    fun configureRegistrationCertificateTrustStore(
+        registrationTrustedCertificates: List<X509Certificate>,
+        revocationPolicy: RevocationPolicy = RevocationPolicy.HardFail,
+    ) = apply {
+        this.registrationTrustedCertificates = registrationTrustedCertificates
+        this.registrationRevocationPolicy = revocationPolicy
+    }
+
+    /**
+     * Configure [registrationTrustedCertificates] with certificates loaded from raw resources.
+     *
+     * @param context the context
+     * @param certificateRes the registration certificate signer trust anchors' raw resources
+     * @param revocationPolicy the certificate revocation checking policy (default [RevocationPolicy.HardFail])
+     * @return the [EudiWalletConfig] instance
+     */
+    fun configureRegistrationCertificateTrustStore(
+        context: Context,
+        @RawRes vararg certificateRes: Int,
+        revocationPolicy: RevocationPolicy = RevocationPolicy.HardFail,
+    ) = apply {
+        this.registrationTrustedCertificates = certificateRes.map { context.getCertificate(it) }
+        this.registrationRevocationPolicy = revocationPolicy
+    }
+
+    /**
      * The policy for handling the relying party's registration certificate during presentation
      * requests.
      *
@@ -610,10 +662,11 @@ class EudiWalletConfig {
      *
      * Validating a registration certificate against the ETSI Trusted Lists requires the Wallet-Relying
      * Party registration certificate provider list to be configured; supply its location via the
-     * `wrprcProviders` entry of the ETSI trust configuration ([configureEtsiTrust]). When the ETSI
-     * trust source is not configured, the certificates set through [configureReaderTrustStore] are
-     * used as a testing fallback; without either, a registration certificate cannot be trusted and
-     * validation fails.
+     * `wrprcProviders` entry of the ETSI trust configuration ([configureEtsiTrust]). Certificates set
+     * through [configureRegistrationCertificateTrustStore] take precedence over it. When neither is
+     * configured, the certificates set through [configureReaderTrustStore] are used as a testing
+     * fallback; without any of these, a registration certificate cannot be trusted and validation
+     * fails.
      *
      * @see WrpRegistrationPolicy
      */

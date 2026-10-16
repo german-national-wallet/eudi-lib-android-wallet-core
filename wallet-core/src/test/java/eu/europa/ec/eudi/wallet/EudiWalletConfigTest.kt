@@ -17,6 +17,7 @@
 package eu.europa.ec.eudi.wallet
 
 import eu.europa.ec.eudi.iso18013.transfer.readerauth.ReaderTrustStore
+import eu.europa.ec.eudi.iso18013.transfer.readerauth.RevocationPolicy
 import eu.europa.ec.eudi.wallet.issue.openid4vci.OpenId4VciManager
 import eu.europa.ec.eudi.wallet.logging.Logger
 import eu.europa.ec.eudi.wallet.transfer.openId4vp.ClientIdScheme
@@ -127,6 +128,7 @@ class EudiWalletConfigTest {
         assertFalse(config.enableBleCentralMode)
         assertTrue(config.clearBleCache)
         assertNull(config.readerTrustedCertificates)
+        assertNull(config.registrationTrustedCertificates)
         assertNull(config.openId4VpConfig)
         assertNull(config.openId4VciConfig)
         assertNull(config.dcapiConfig)
@@ -150,6 +152,18 @@ class EudiWalletConfigTest {
         }
 
         assertEquals(customTrustStore, config.readerTrustStore)
+        assertNull(config.readerTrustedCertificates)
+    }
+
+    @Test
+    fun testConfigureRegistrationCertificateTrustStoreKeepsReaderTrustApart() {
+        val registrationCa = mockk<X509Certificate>()
+        val config = EudiWalletConfig {
+            configureRegistrationCertificateTrustStore(listOf(registrationCa), RevocationPolicy.SoftFail)
+        }
+
+        assertEquals(listOf(registrationCa), config.registrationTrustedCertificates)
+        assertEquals(RevocationPolicy.SoftFail, config.registrationRevocationPolicy)
         assertNull(config.readerTrustedCertificates)
     }
 }

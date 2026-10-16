@@ -16,6 +16,7 @@
 
 package eu.europa.ec.eudi.wallet.trust
 
+import eu.europa.ec.eudi.iso18013.transfer.readerauth.RevocationPolicy
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
@@ -28,41 +29,41 @@ class X509CertificateChainTrustTest {
 
     @Test
     fun `chain anchored in a trust anchor is trusted`() = runTest {
-        val trust = X509CertificateChainTrust(listOf(rsaTrustedRootCertificate), checkRevocation = false)
+        val trust = X509CertificateChainTrust(listOf(rsaTrustedRootCertificate), RevocationPolicy.NoCheck)
 
         assertTrue(trust.isTrusted(chain))
     }
 
     @Test
     fun `chain whose anchor is not configured is not trusted`() = runTest {
-        val trust = X509CertificateChainTrust(listOf(ecLeafSignedByIntermediateCertificate), checkRevocation = false)
+        val trust = X509CertificateChainTrust(listOf(ecLeafSignedByIntermediateCertificate), RevocationPolicy.NoCheck)
 
         assertFalse(trust.isTrusted(listOf(ecIntermediateCertificate)))
     }
 
     @Test
     fun `chain missing its intermediate is not trusted`() = runTest {
-        val trust = X509CertificateChainTrust(listOf(rsaTrustedRootCertificate), checkRevocation = false)
+        val trust = X509CertificateChainTrust(listOf(rsaTrustedRootCertificate), RevocationPolicy.NoCheck)
 
         assertFalse(trust.isTrusted(listOf(ecLeafSignedByIntermediateCertificate)))
     }
 
     @Test
     fun `revocation checking rejects a chain whose revocation status is unavailable`() = runTest {
-        val trust = X509CertificateChainTrust(listOf(rsaTrustedRootCertificate), checkRevocation = true)
+        val trust = X509CertificateChainTrust(listOf(rsaTrustedRootCertificate), RevocationPolicy.HardFail)
 
         assertFalse(trust.isTrusted(chain))
     }
 
     @Test
     fun `empty chain is not trusted`() = runTest {
-        val trust = X509CertificateChainTrust(listOf(rsaTrustedRootCertificate), checkRevocation = false)
+        val trust = X509CertificateChainTrust(listOf(rsaTrustedRootCertificate), RevocationPolicy.NoCheck)
 
         assertFalse(trust.isTrusted(emptyList()))
     }
 
     @Test
     fun `empty trust anchors are rejected`() {
-        assertFailsWith<IllegalArgumentException> { X509CertificateChainTrust(emptyList(), checkRevocation = false) }
+        assertFailsWith<IllegalArgumentException> { X509CertificateChainTrust(emptyList(), RevocationPolicy.NoCheck) }
     }
 }

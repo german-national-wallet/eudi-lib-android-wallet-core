@@ -30,6 +30,7 @@ import org.junit.Before
 import org.junit.Test
 import org.mockito.MockedStatic
 import java.security.Security
+import java.security.cert.CRLException
 import java.security.cert.CertPathValidator
 import java.security.cert.CertPathValidatorException
 import java.security.cert.CertStore
@@ -266,6 +267,81 @@ class ReaderTrustStoreImplTest {
             assertFalse(result, "Validation should fail once the timeout elapses")
             assertTrue(elapsed < 5.seconds, "validation took $elapsed")
             assertEquals(listOf("CERTIFICATE_PATH_TIMEOUT"), logged)
+        } finally {
+            unmockkStatic(CertPathValidator::class)
+        }
+    }
+
+    @Test
+    fun testSoftFailValidatesWithoutRevocationWhenItExceedsTheTimeout() {
+        val offlineValidator = CertPathValidator.getInstance("PKIX")
+        val hangingValidator = mockk<CertPathValidator>()
+        every { hangingValidator.revocationChecker } returns offlineValidator.revocationChecker
+        every { hangingValidator.validate(any(), any()) } answers {
+            Thread.sleep(10_000)
+            error("unreachable")
+        }
+        mockkStatic(CertPathValidator::class)
+        every { CertPathValidator.getInstance("PKIX") } returnsMany listOf(hangingValidator, offlineValidator)
+        try {
+            val logged = mutableListOf<String>()
+            val profileValidation = mockk<ProfileValidation>()
+            every { profileValidation.validate(any(), any()) } returns true
+            val trustStore = ReaderTrustStoreImpl(
+                trustedCertificates = listOf(rootCertificate),
+                profileValidation = profileValidation,
+                errorLogger = { _, message, _ -> logged += message },
+                revocationPolicy = RevocationPolicy.SoftFail,
+                revocationCheckTimeout = 500.milliseconds,
+            )
+
+            val start = System.nanoTime()
+            val result = trustStore.validateCertificationTrustPath(listOf(leafCertificate, rootCertificate))
+            val elapsed = (System.nanoTime() - start).nanoseconds
+
+            assertTrue(result, "SoftFail should tolerate a stalled revocation check")
+            assertTrue(elapsed < 5.seconds, "validation took $elapsed")
+            assertEquals(listOf("CERTIFICATE_PATH_TIMEOUT_SOFT_FAIL"), logged)
+        } finally {
+            unmockkStatic(CertPathValidator::class)
+        }
+    }
+
+    @Test
+    fun testSoftFailValidatesWithoutRevocationWhenTheCrlIsUnreadable() {
+        assertTrue(validateWithUnreadableCrl(RevocationPolicy.SoftFail, expectedLog = "CERTIFICATE_PATH_CRL_UNREADABLE_SOFT_FAIL"))
+    }
+
+    @Test
+    fun testHardFailRejectsAnUnreadableCrl() {
+        assertFalse(validateWithUnreadableCrl(RevocationPolicy.HardFail, expectedLog = "CERTIFICATE_PATH_ERROR"))
+    }
+
+    // Stands in for a distribution point that serves an HTML page, which the platform reports as a
+    // CRLException rather than a network error.
+    private fun validateWithUnreadableCrl(policy: RevocationPolicy, expectedLog: String): Boolean {
+        val offlineValidator = CertPathValidator.getInstance("PKIX")
+        val crlValidator = mockk<CertPathValidator>()
+        every { crlValidator.revocationChecker } returns offlineValidator.revocationChecker
+        every { crlValidator.validate(any(), any()) } throws
+            CertPathValidatorException(CRLException("No certificate found"))
+        mockkStatic(CertPathValidator::class)
+        every { CertPathValidator.getInstance("PKIX") } returnsMany listOf(crlValidator, offlineValidator)
+        try {
+            val logged = mutableListOf<String>()
+            val profileValidation = mockk<ProfileValidation>()
+            every { profileValidation.validate(any(), any()) } returns true
+            val trustStore = ReaderTrustStoreImpl(
+                trustedCertificates = listOf(rootCertificate),
+                profileValidation = profileValidation,
+                errorLogger = { _, message, _ -> logged += message },
+                revocationPolicy = policy,
+            )
+
+            val result = trustStore.validateCertificationTrustPath(listOf(leafCertificate, rootCertificate))
+
+            assertEquals(listOf(expectedLog), logged)
+            return result
         } finally {
             unmockkStatic(CertPathValidator::class)
         }
