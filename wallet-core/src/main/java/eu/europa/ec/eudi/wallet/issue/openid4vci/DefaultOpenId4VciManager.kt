@@ -25,6 +25,7 @@ import eu.europa.ec.eudi.openid4vci.AccessToken
 import eu.europa.ec.eudi.openid4vci.AuthorizedRequest
 import eu.europa.ec.eudi.openid4vci.CredentialConfigurationIdentifier
 import eu.europa.ec.eudi.openid4vci.CredentialIssuanceError
+import eu.europa.ec.eudi.openid4vci.CIAuthorizationServerMetadata
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerId
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadata
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadataResolver
@@ -143,6 +144,11 @@ internal class DefaultOpenId4VciManager(
         }.onFailure { logger?.logIssuerMetadataFailure(TAG, issuerMetadataPolicy, it) }
     }
 
+    // Resolved like issuance and re-issuance resolve it (same metadata policy, same first
+    // authorization server); IssuerCreator logs metadata failures.
+    override suspend fun getAuthorizationServerMetadata(issuerUrl: String): Result<CIAuthorizationServerMetadata> =
+        runCatching { issuerCreator.resolveAuthorizationServerMetadata(issuerUrl) }
+
     @Deprecated("Use issueDocumentByConfigurationIdentifiers that accepts a list of identifiers")
     override fun issueDocumentByConfigurationIdentifier(
         issuerUrl: String,
@@ -227,6 +233,22 @@ internal class DefaultOpenId4VciManager(
         }
     }
 
+    /**
+     * Signer for the proof of possession of an externally supplied wallet instance attestation.
+     */
+    private fun wiaPopSigner(publicKey: JWK, privateKey: PrivateKey): Signer<JWK> =
+        signerFromPrivateKey(
+            // TODO(Tobias): Derive this from the key (algorithm "EC", curve "secp256r1")
+            // somehow. VCI library's SigningOps has a Curve.toJavaSigningAlg() extension
+            // for nimbus curves, mapping P_256 -> SHA256withECDSA. For now I'm hard
+            // coding this. walletWiaPopPrivateKey.algorithm is "EC".
+            signingAlgorithm = "SHA256withECDSA",
+            privateKey = privateKey,
+            publicMaterial = publicKey,
+            secureRandom = null,
+            provider = null,
+        )
+
     override fun issueDocumentByConfigurationIdentifierAttested(
         issuerUrl: String,
         credentialConfigurationId: String,
@@ -261,17 +283,7 @@ internal class DefaultOpenId4VciManager(
     ) {
         launch(executor, onIssueEvent) { coroutineScope, listener ->
             try {
-                val walletWiaPopSigner = signerFromPrivateKey(
-                    // TODO(Tobias): Derive this from the key (algorithm "EC", curve "secp256r1")
-                    // somehow. VCI library's SigningOps has a Curve.toJavaSigningAlg() extension
-                    // for nimbus curves, mapping P_256 -> SHA256withECDSA. For now I'm hard
-                    // coding this. walletWiaPopPrivateKey.algorithm is "EC".
-                    signingAlgorithm = "SHA256withECDSA",
-                    privateKey = walletWiaPopPrivateKey,
-                    publicMaterial = walletWiaPopPublicKey,
-                    secureRandom = null,
-                    provider = null,
-                )
+                val walletWiaPopSigner = wiaPopSigner(walletWiaPopPublicKey, walletWiaPopPrivateKey)
 
                 val issuer = issuerCreator.createIssuerWithAttestation(
                     issuerUrl = issuerUrl,
@@ -340,6 +352,31 @@ internal class DefaultOpenId4VciManager(
             } catch (e: Throwable) {
                 listener(failure(e))
                 coroutineScope.cancel("issueDocumentByOffer failed", e)
+            }
+        }
+    }
+
+    override fun issueDocumentByOfferAttested(
+        offer: Offer,
+        walletAttestation: SignedJWT,
+        walletWiaPopPublicKey: JWK,
+        walletWiaPopPrivateKey: PrivateKey,
+        txCode: String?,
+        executor: Executor?,
+        onIssueEvent: OpenId4VciManager.OnIssueEvent,
+    ) {
+        launch(executor, onIssueEvent) { coroutineScope, listener ->
+            try {
+                val walletWiaPopSigner = wiaPopSigner(walletWiaPopPublicKey, walletWiaPopPrivateKey)
+                val (issuer, issuerRegistration) = issuerCreator.createIssuerWithAttestation(
+                    offer = offer,
+                    attestationJWT = walletAttestation,
+                    walletWiaPopSigner = walletWiaPopSigner,
+                )
+                doIssue(issuer, offer.copy(issuerRegistration = issuerRegistration), txCode, listener)
+            } catch (e: Throwable) {
+                listener(failure(e))
+                coroutineScope.cancel("issueDocumentByOfferAttested failed", e)
             }
         }
     }
@@ -565,13 +602,7 @@ internal class DefaultOpenId4VciManager(
                 //  client attestation on /token, so the WIA is supplied out-of-band here; otherwise
                 //  the refresh_token request is rejected with invalid_client "Client Attestation not
                 //  found".
-                val walletWiaPopSigner = signerFromPrivateKey(
-                    signingAlgorithm = "SHA256withECDSA",
-                    privateKey = walletWiaPopPrivateKey,
-                    publicMaterial = walletWiaPopPublicKey,
-                    secureRandom = null,
-                    provider = null,
-                )
+                val walletWiaPopSigner = wiaPopSigner(walletWiaPopPublicKey, walletWiaPopPrivateKey)
                 //  createIssuerWithAttestation does not resolve an issuer registration
                 //  certificate, so the attested path has no registration outcome to present.
                 IssuerCreation(

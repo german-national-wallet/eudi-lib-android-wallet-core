@@ -23,6 +23,7 @@ import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vci.CredentialConfigurationIdentifier
+import eu.europa.ec.eudi.openid4vci.CIAuthorizationServerMetadata
 import eu.europa.ec.eudi.openid4vci.CredentialIssuerMetadata
 import eu.europa.ec.eudi.openid4vci.CredentialResponseEncryptionPolicy
 import eu.europa.ec.eudi.openid4vci.CredentialReusePolicies
@@ -64,6 +65,14 @@ interface OpenId4VciManager {
      * @param issuerUrl the issuer URL to resolve metadata from
      */
     suspend fun getIssuerMetadata(issuerUrl: String): Result<CredentialIssuerMetadata>
+
+    /**
+     * Provides the metadata of the (first) authorization server of the given issuer, e.g. to
+     * decide from its `token_endpoint_auth_methods_supported` whether a wallet instance
+     * attestation has to be supplied for an issuer that has no resolved [Offer] at hand.
+     * @param issuerUrl the issuer URL to resolve metadata from
+     */
+    suspend fun getAuthorizationServerMetadata(issuerUrl: String): Result<CIAuthorizationServerMetadata>
 
     /**
      * Resolves the credential issuer's registration certificate (ETSI TS 119 472-3 `issuer_info`)
@@ -205,6 +214,30 @@ interface OpenId4VciManager {
      */
     fun issueDocumentByOffer(
         offer: Offer,
+        txCode: String? = null,
+        executor: Executor? = null,
+        onIssueEvent: OnIssueEvent,
+    )
+
+    /**
+     * Issue a document using an offer, authenticating the client at the PAR and token endpoints
+     * with the given wallet instance attestation instead of one obtained from the
+     * [WalletAttestationsProvider].
+     * @param offer the offer to issue
+     * @param walletAttestation the wallet instance attestation JWT (WIA)
+     * @param walletWiaPopPublicKey public key for the WIA proof-of-possession
+     * @param walletWiaPopPrivateKey private key for the WIA proof-of-possession
+     * @param txCode see [issueDocumentByOffer]
+     * @param executor see [issueDocumentByOffer]
+     * @param onIssueEvent see [issueDocumentByOffer]
+     *
+     * @see[IssueEvent] on how to handle the result
+     */
+    fun issueDocumentByOfferAttested(
+        offer: Offer,
+        walletAttestation: SignedJWT,
+        walletWiaPopPublicKey: JWK,
+        walletWiaPopPrivateKey: PrivateKey,
         txCode: String? = null,
         executor: Executor? = null,
         onIssueEvent: OnIssueEvent,

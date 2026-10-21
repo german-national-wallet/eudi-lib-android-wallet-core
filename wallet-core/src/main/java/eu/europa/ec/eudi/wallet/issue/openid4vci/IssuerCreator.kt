@@ -149,6 +149,29 @@ internal class IssuerCreator(
     suspend fun createIssuer(offer: Offer): IssuerCreation =
         doCreateIssuer(offer.credentialOffer, offer.issuerRegistration)
 
+    /**
+     * Creates an [Issuer] from the given [Offer], authenticating the client with an externally
+     * supplied wallet instance attestation instead of asking the [WalletInstanceAttestationProvider].
+     * Registration handling is the same as [createIssuer].
+     * @param offer The [Offer].
+     * @param attestationJWT The wallet instance attestation (WIA).
+     * @param walletWiaPopSigner Signer for the WIA proof-of-possession.
+     * @return The [Issuer] and the registration outcome.
+     */
+    suspend fun createIssuerWithAttestation(
+        offer: Offer,
+        attestationJWT: SignedJWT,
+        walletWiaPopSigner: Signer<JWK>,
+    ): IssuerCreation =
+        doCreateIssuer(
+            credentialOffer = offer.credentialOffer,
+            resolvedRegistration = offer.issuerRegistration,
+            suppliedClientAuthentication = externalAttestationClientAuthentication(
+                attestationJWT,
+                walletWiaPopSigner,
+            ),
+        )
+
     suspend fun createIssuerWithAttestation(
         issuerUrl: String,
         attestationJWT: SignedJWT,
@@ -156,9 +179,7 @@ internal class IssuerCreator(
         credentialConfigurationIdentifiers: List<CredentialConfigurationIdentifier>,
         existingDpopKeyAlias: String? = null,
     ): Issuer {
-        val authorizationServerMetadata = CredentialIssuerId(issuerUrl)
-            .map { getIssuerMetadata(it).second.first() }
-            .getOrThrow()
+        val authorizationServerMetadata = resolveAuthorizationServerMetadata(issuerUrl)
 
         return Issuer.makeWalletInitiated(
             config = config.toOpenId4VCIConfigWithAttestation(
@@ -223,6 +244,17 @@ internal class IssuerCreator(
     }
 
 
+    /**
+     * Resolves the metadata of the issuer's first authorization server, the one wallet-initiated
+     * issuance and re-issuance authenticate to. Metadata failures are logged by [getIssuerMetadata].
+     * @param issuerUrl The issuer URL.
+     * @return The authorization server metadata.
+     */
+    suspend fun resolveAuthorizationServerMetadata(issuerUrl: String): CIAuthorizationServerMetadata =
+        CredentialIssuerId(issuerUrl)
+            .map { getIssuerMetadata(it).second.first() }
+            .getOrThrow()
+
     private suspend fun getIssuerMetadata(credentialIssuerId: CredentialIssuerId): Pair<CredentialIssuerMetadata, List<CIAuthorizationServerMetadata>> {
         return try {
             ktorHttpClientFactory().use {
@@ -238,6 +270,7 @@ internal class IssuerCreator(
     private suspend fun doCreateIssuer(
         credentialOffer: CredentialOffer,
         resolvedRegistration: RegistrationCertificateResult? = null,
+        suppliedClientAuthentication: ClientAuthentication? = null,
     ): IssuerCreation {
         var evaluatedRegistration: RegistrationCertificateResult? = null
         val issuer = Issuer.make(
@@ -246,6 +279,7 @@ internal class IssuerCreator(
                 credentialIssuerMetadata = credentialOffer.credentialIssuerMetadata,
                 resolvedRegistration = resolvedRegistration,
                 onRegistrationEvaluated = { evaluatedRegistration = it },
+                suppliedClientAuthentication = suppliedClientAuthentication,
             ),
             credentialOffer = credentialOffer,
             httpClient = ktorHttpClientFactory()
@@ -312,6 +346,9 @@ internal class IssuerCreator(
     /**
      * Converts the [OpenId4VciManager.Config] to [OpenId4VCIConfig].
      * @receiver The [OpenId4VciManager.Config].
+     * @param suppliedClientAuthentication client authentication built by the caller (e.g. from an
+     *   externally supplied wallet instance attestation); when null it is derived from the config,
+     *   which for attestation-based authentication asks the [WalletInstanceAttestationProvider].
      * @return The [OpenId4VCIConfig].
      */
     private suspend fun OpenId4VciManager.Config.toOpenId4VCIConfig(
@@ -320,8 +357,13 @@ internal class IssuerCreator(
         credentialIssuerMetadata: CredentialIssuerMetadata? = null,
         resolvedRegistration: RegistrationCertificateResult? = null,
         onRegistrationEvaluated: (RegistrationCertificateResult) -> Unit = {},
+        suppliedClientAuthentication: ClientAuthentication? = null,
     ): OpenId4VCIConfig {
-        val auth = authorizationServerMetadata.toClientAuthentication().getOrThrow()
+        // Only provider-driven attestation (toClientAuthentication) has a WalletKeyManager PoP key;
+        // reset it so an earlier issuance's key id is not persisted for a supplied attestation.
+        clientAttestationPopKeyId = null
+        val auth = suppliedClientAuthentication
+            ?: authorizationServerMetadata.toClientAuthentication().getOrThrow()
         clientAuthentication = auth
         // Resolve DPoP usage
         val dPoPUsage = when (dpopConfig) {
@@ -457,21 +499,22 @@ internal class IssuerCreator(
             registrationCertificatePolicy = registrationCertificatePolicy,
         )
     }
-    private suspend fun OpenId4VciManager.Config.toOpenId4VCIConfigWithAttestation(
-        authorizationServerMetadata: CIAuthorizationServerMetadata,
+
+    /**
+     * Builds attestation-based client authentication from an externally supplied wallet instance
+     * attestation JWT and its PoP signer, wrapped in the openid4vci ProvisionClientAttestation
+     * abstraction (see WalletAttestationKey.toClientAuthentication for the provider-driven
+     * equivalent used when no attestation is supplied).
+     *
+     * In attestation-based client authentication the request `client_id` (and the client
+     * attestation PoP `iss`) must equal the client attestation's `sub`; using the configured
+     * clientAuthenticationType.clientId instead makes the issuer reject the request with
+     * "Invalid client id". Derive the client id from the attestation itself.
+     */
+    private fun externalAttestationClientAuthentication(
         attestationJWT: SignedJWT,
         walletWiaPopSigner: Signer<JWK>,
-        existingDpopKeyAlias: String? = null,
-    ): OpenId4VCIConfig {
-        // Build attestation-based client authentication from the externally supplied wallet
-        // instance attestation JWT and its PoP signer, wrapped in the openid4vci 0.12.1
-        // ProvisionClientAttestation abstraction (see WalletAttestationKey.toClientAuthentication
-        // for the provider-driven equivalent used by the normal issuance path).
-        //
-        // In attestation-based client authentication the request `client_id` (and the client
-        // attestation PoP `iss`) must equal the client attestation's `sub`; using the configured
-        // clientAuthenticationType.clientId instead makes the issuer reject the request with
-        // "Invalid client id". Derive the client id from the attestation itself.
+    ): ClientAuthentication.AttestationBased {
         val clientId = requireNotNull(attestationJWT.jwtClaimsSet.subject) {
             "Client attestation JWT is missing the 'sub' (client id) claim"
         }
@@ -489,13 +532,24 @@ internal class IssuerCreator(
                     popSigner = walletWiaPopSigner,
                 )
         }
-        val auth = ClientAuthentication.AttestationBased(
+        return ClientAuthentication.AttestationBased(
             id = clientId,
             provisionClientAttestation = provisionClientAttestation,
         )
+    }
+
+    private suspend fun OpenId4VciManager.Config.toOpenId4VCIConfigWithAttestation(
+        authorizationServerMetadata: CIAuthorizationServerMetadata,
+        attestationJWT: SignedJWT,
+        walletWiaPopSigner: Signer<JWK>,
+        existingDpopKeyAlias: String? = null,
+    ): OpenId4VCIConfig {
+        val auth = externalAttestationClientAuthentication(attestationJWT, walletWiaPopSigner)
         // Keep issuer-level state aligned with normal issuance path; downstream response
-        // processing relies on this for metadata/re-issuance handling.
+        // processing relies on this for metadata/re-issuance handling. The supplied PoP key is
+        // not a WalletKeyManager key, so no PoP key id applies.
         clientAuthentication = auth
+        clientAttestationPopKeyId = null
 
         val dPoPUsage = when (dpopConfig) {
             DPopConfig.Disabled -> DPoPUsage.Never
