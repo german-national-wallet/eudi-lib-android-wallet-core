@@ -16,6 +16,7 @@
 
 package eu.europa.ec.eudi.wallet.transfer.openId4vp
 
+import eu.europa.ec.eudi.openid4vp.ErrorDispatchPolicy
 import eu.europa.ec.eudi.openid4vp.ResponseMode
 import eu.europa.ec.eudi.wallet.transfer.openId4vp.OpenId4VpConfig.EncryptionPolicy
 import org.junit.Test
@@ -127,6 +128,21 @@ class OpenId4VpConfigTest {
         // Confirm the custom policy is the one actually invoked.
         config.encryptionPolicy.enforce(ResponseMode.DCApi)
         assertEquals(ResponseMode.DCApi, seenMode)
+    }
+
+    @Test
+    fun `Builder default errorDispatchPolicy is OnlyAuthenticatedClients`() {
+        val config = defaultBuilder().build()
+        assertEquals(ErrorDispatchPolicy.OnlyAuthenticatedClients, config.errorDispatchPolicy)
+    }
+
+    @Test
+    fun `Builder withErrorDispatchPolicy overrides the default`() {
+        val config = defaultBuilder()
+            .withErrorDispatchPolicy(ErrorDispatchPolicy.AllClients)
+            .build()
+
+        assertEquals(ErrorDispatchPolicy.AllClients, config.errorDispatchPolicy)
     }
 
     private fun defaultBuilder(): OpenId4VpConfig.Builder = OpenId4VpConfig.Builder()
