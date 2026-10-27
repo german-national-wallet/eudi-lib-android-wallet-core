@@ -455,6 +455,7 @@ interface EudiWallet : DocumentManager, PresentationManager, DocumentStatusResol
                             profileValidation = { _, _ -> true },
                             revocationPolicy = config.revocationPolicy,
                             revocationCheckTimeout = config.revocationCheckTimeout,
+                            crlCache = config.crlCache,
                         )
                     }
                 })?.also {
@@ -488,6 +489,7 @@ interface EudiWallet : DocumentManager, PresentationManager, DocumentStatusResol
                             profileValidation = { _, _ -> true },
                             revocationPolicy = config.registrationRevocationPolicy,
                             revocationCheckTimeout = config.revocationCheckTimeout,
+                            crlCache = config.crlCache,
                         ).asCertificateTrust()
                     }
                     ?: (readerTrustStore ?: config.readerTrustStore)
@@ -506,6 +508,7 @@ interface EudiWallet : DocumentManager, PresentationManager, DocumentStatusResol
                                     profileValidation = { _, _ -> true },
                                     revocationPolicy = config.revocationPolicy,
                                     revocationCheckTimeout = config.revocationCheckTimeout,
+                                    crlCache = config.crlCache,
                                 ).asCertificateTrust()
                             }
                     }

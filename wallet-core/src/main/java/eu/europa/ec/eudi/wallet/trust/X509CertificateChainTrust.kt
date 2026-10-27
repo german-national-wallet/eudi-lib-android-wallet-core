@@ -16,6 +16,7 @@
 
 package eu.europa.ec.eudi.wallet.trust
 
+import eu.europa.ec.eudi.iso18013.transfer.readerauth.CrlCache
 import eu.europa.ec.eudi.iso18013.transfer.readerauth.ReaderTrustStoreImpl
 import eu.europa.ec.eudi.iso18013.transfer.readerauth.RevocationPolicy
 import eu.europa.ec.eudi.openid4vci.CertificateChainTrust
@@ -46,12 +47,14 @@ import kotlin.time.Duration
  * @param revocationPolicy the certificate revocation checking policy
  * @param revocationCheckTimeout the upper bound for a validation, including any CRL download
  * @param logger optional [Logger] for diagnostic output
+ * @param crlCache the cache that keeps the downloaded CRLs between validations, or `null` to download them every time
  */
 class X509CertificateChainTrust @JvmOverloads constructor(
     trustAnchors: List<X509Certificate>,
     revocationPolicy: RevocationPolicy,
     revocationCheckTimeout: Duration = ReaderTrustStoreImpl.DEFAULT_REVOCATION_CHECK_TIMEOUT,
     private val logger: Logger? = null,
+    crlCache: CrlCache? = null,
 ) : CertificateChainTrust {
 
     init {
@@ -64,6 +67,7 @@ class X509CertificateChainTrust @JvmOverloads constructor(
         errorLogger = { tag, message, cause -> logger?.e(TAG, "$tag: $message", cause) },
         revocationPolicy = revocationPolicy,
         revocationCheckTimeout = revocationCheckTimeout,
+        crlCache = crlCache,
     )
 
     override suspend fun isTrusted(chain: List<X509Certificate>): Boolean {
