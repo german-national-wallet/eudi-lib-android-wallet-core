@@ -18,6 +18,7 @@ package eu.europa.ec.eudi.wallet.trust
 import android.content.Context
 import androidx.annotation.RawRes
 import eu.europa.ec.eudi.etsi1196x2.consultation.IsChainTrustedForEUDIW
+import eu.europa.ec.eudi.iso18013.transfer.readerauth.CrlCache
 import eu.europa.ec.eudi.iso18013.transfer.readerauth.ReaderTrustStore
 import eu.europa.ec.eudi.iso18013.transfer.readerauth.ReaderTrustStoreImpl
 import eu.europa.ec.eudi.iso18013.transfer.readerauth.RevocationPolicy
@@ -115,6 +116,7 @@ class ReaderAuthenticationConfigBuilder {
      * @param etsiSource the centrally configured ETSI trust source (may be null)
      * @param logger the wallet logger for diagnostic output
      * @param revocationCheckTimeout the upper bound for a trust path validation against [trustedCertificates]
+     * @param crlCache the cache for the CRLs downloaded while validating against [trustedCertificates]
      * @return the resolved [ReaderAuthPolicy]
      * @throws IllegalArgumentException if [enforceIfPresent] or [alwaysRequire] is set
      *   but no trust source is available
@@ -123,6 +125,7 @@ class ReaderAuthenticationConfigBuilder {
         etsiSource: IsChainTrustedForEUDIW<List<X509Certificate>, TrustAnchor>?,
         logger: Logger,
         revocationCheckTimeout: Duration = ReaderTrustStoreImpl.DEFAULT_REVOCATION_CHECK_TIMEOUT,
+        crlCache: CrlCache? = null,
     ): ReaderAuthPolicy {
         val trustStore: ReaderTrustStore? = when {
             customTrustStore != null -> customTrustStore
@@ -132,6 +135,7 @@ class ReaderAuthenticationConfigBuilder {
                 profileValidation = { _, _ -> true },
                 revocationPolicy = revocationPolicy,
                 revocationCheckTimeout = revocationCheckTimeout,
+                crlCache = crlCache,
             )
             etsiSource != null -> etsiSource.asReaderTrustStore()
             else -> null

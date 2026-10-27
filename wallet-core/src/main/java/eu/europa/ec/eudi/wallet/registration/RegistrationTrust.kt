@@ -87,6 +87,7 @@ internal data class RegistrationTrust(
                 trustedCertificates = config.wrpRegistrationTrustedCertificates,
                 revocationPolicy = config.wrpRegistrationRevocationPolicy,
                 revocationCheckTimeout = config.revocationCheckTimeout,
+                crlCache = config.crlCache,
                 etsiSource = etsiSource,
                 logger = logger
             ),
@@ -94,6 +95,7 @@ internal data class RegistrationTrust(
                 statusListTrustedCertificates = config.wrpRegistrationStatusListTrustedCertificates,
                 revocationPolicy = config.wrpRegistrationRevocationPolicy,
                 revocationCheckTimeout = config.revocationCheckTimeout,
+                crlCache = config.crlCache,
                 etsiSource = etsiSource,
                 logger = logger
             ),
@@ -112,6 +114,7 @@ internal data class RegistrationTrust(
                 trustedCertificates = config.issuerRegistrationTrustedCertificates,
                 revocationPolicy = config.issuerRegistrationRevocationPolicy,
                 revocationCheckTimeout = config.revocationCheckTimeout,
+                crlCache = config.crlCache,
                 etsiSource = etsiSource,
                 logger = logger
             ),
@@ -119,6 +122,7 @@ internal data class RegistrationTrust(
                 statusListTrustedCertificates = config.issuerRegistrationStatusListTrustedCertificates,
                 revocationPolicy = config.issuerRegistrationRevocationPolicy,
                 revocationCheckTimeout = config.revocationCheckTimeout,
+                crlCache = config.crlCache,
                 etsiSource = etsiSource,
                 logger = logger
             ),

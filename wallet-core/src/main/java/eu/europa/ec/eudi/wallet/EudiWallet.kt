@@ -451,6 +451,7 @@ interface EudiWallet : DocumentManager, PresentationManager, DocumentStatusResol
                     etsiSource = etsiSource,
                     logger = loggerToUse,
                     revocationCheckTimeout = config.revocationCheckTimeout,
+                    crlCache = config.crlCache,
                 )
 
             // Derive trust store for components not yet migrated to ReaderAuthPolicy
