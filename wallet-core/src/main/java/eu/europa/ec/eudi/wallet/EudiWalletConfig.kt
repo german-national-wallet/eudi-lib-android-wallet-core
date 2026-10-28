@@ -21,6 +21,7 @@ import android.content.Context
 import androidx.annotation.RawRes
 import eu.europa.ec.eudi.iso18013.transfer.engagement.NfcEngagementService
 import eu.europa.ec.eudi.etsi1196x2.consultation.IsChainTrustedForEUDIW
+import eu.europa.ec.eudi.iso18013.transfer.readerauth.CrlCache
 import eu.europa.ec.eudi.iso18013.transfer.readerauth.ReaderTrustStore
 import eu.europa.ec.eudi.iso18013.transfer.readerauth.ReaderTrustStoreImpl
 import eu.europa.ec.eudi.iso18013.transfer.readerauth.RevocationPolicy
@@ -597,6 +598,34 @@ class EudiWalletConfig {
     fun configureRevocationCheckTimeout(timeout: Duration) = apply {
         require(timeout.isPositive()) { "revocationCheckTimeout must be positive" }
         this.revocationCheckTimeout = timeout
+    }
+
+    /**
+     * The cache that keeps the CRLs downloaded for revocation checking between trust path
+     * validations, or `null` (the default) to download them for every validation.
+     *
+     * Like [revocationPolicy], this applies only to the built-in [ReaderTrustStore]s built from
+     * static trusted certificates, for reader authentication and for the registration certificate
+     * signer chain. Share the same [CrlCache] with an [eu.europa.ec.eudi.wallet.trust.X509CertificateChainTrust]
+     * to reuse the CRLs there.
+     *
+     * @see configureCrlCache
+     */
+    var crlCache: CrlCache? = null
+        private set
+
+    /**
+     * Configure [crlCache].
+     *
+     * ```
+     * configureCrlCache(CrlCache.inCacheDirectory(context, refreshInterval = 1.hours, httpClientFactory = { httpClient }))
+     * ```
+     *
+     * @param crlCache the cache to use, or `null` to download the CRLs for every validation
+     * @return the [EudiWalletConfig] instance
+     */
+    fun configureCrlCache(crlCache: CrlCache?) = apply {
+        this.crlCache = crlCache
     }
 
     /**
