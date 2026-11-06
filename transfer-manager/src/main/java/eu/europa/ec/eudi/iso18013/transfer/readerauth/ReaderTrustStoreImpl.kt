@@ -18,7 +18,11 @@ package eu.europa.ec.eudi.iso18013.transfer.readerauth
 
 import android.util.Log
 import eu.europa.ec.eudi.iso18013.transfer.readerauth.profile.ProfileValidation
+import org.bouncycastle.asn1.ASN1OctetString
+import org.bouncycastle.asn1.ASN1Primitive
 import org.bouncycastle.asn1.x500.X500Name
+import org.bouncycastle.asn1.x509.CRLDistPoint
+import org.bouncycastle.asn1.x509.Extension
 import java.security.InvalidAlgorithmParameterException
 import java.security.NoSuchAlgorithmException
 import java.security.cert.CRLException
@@ -94,7 +98,19 @@ class ReaderTrustStoreImpl(
             // The platform fetches CRLs without a timeout, so bound the path validation.
             val validation = validationExecutor.submit<PKIXCertPathValidatorResult> {
                 val crls = if (checker == null) emptyList() else crlCache?.crlsFor(chainToDocumentSigner).orEmpty()
-                validator.validate(certPath, pkixParameters(checker, crls)) as PKIXCertPathValidatorResult
+                val withoutCrl = if (checker == null || crlCache == null) -1 else firstWithoutCrl(certificationPath, crls)
+                if (withoutCrl < 0) {
+                    validator.validate(certPath, pkixParameters(checker, crls)) as PKIXCertPathValidatorResult
+                } else {
+                    // PKIX would download the missing CRL itself, bypassing the cache's HTTP client.
+                    val unavailable = CertPathValidatorException(
+                        "No CRL available", null, certPath, withoutCrl,
+                        CertPathValidatorException.BasicReason.UNDETERMINED_REVOCATION_STATUS,
+                    )
+                    if (revocationPolicy !is RevocationPolicy.SoftFail) throw unavailable
+                    errorLogger(TAG, "CERTIFICATE_PATH_CRL_UNAVAILABLE_SOFT_FAIL", unavailable)
+                    validateOffline(certPath)
+                }
             }
             val certPathValidationResult = try {
                 validation.get(revocationCheckTimeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)
@@ -142,9 +158,7 @@ class ReaderTrustStoreImpl(
         certificates.forEachIndexed { index, certificate ->
             val issuer = certificates.getOrNull(index + 1) ?: anchor
             val revoked = cache.cachedCrlsFor(listOf(certificate)).any { crl ->
-                crl.issuerX500Principal == certificate.issuerX500Principal &&
-                    runCatching { crl.verify(issuer.publicKey) }.isSuccess &&
-                    crl.isRevoked(certificate)
+                crl.isIssuedFor(certificate, listOf(issuer)) && crl.isRevoked(certificate)
             }
             if (revoked) {
                 throw CertPathValidatorException(
@@ -154,6 +168,45 @@ class ReaderTrustStoreImpl(
             }
         }
     }
+
+    /**
+     * The index of the first certificate in [chain], other than a trust anchor, that no CRL of [crls]
+     * covers completely, or -1. PKIX looks up further CRLs itself for a certificate a CRL only partly
+     * covers, so a covering CRL is a complete one, current, from an issuer that may sign CRLs, for a
+     * certificate whose distribution points are not limited to some reasons or another CRL issuer.
+     */
+    private fun firstWithoutCrl(chain: List<X509Certificate>, crls: List<X509CRL>): Int {
+        val now = Date()
+        return chain.indices.firstOrNull { index ->
+            val certificate = chain[index]
+            val issuers = (listOfNotNull(chain.getOrNull(index + 1)) + trustedCertificates).filter { it.maySignCrls() }
+            certificate !in trustedCertificates && (
+                certificate.hasPartialDistributionPoint() ||
+                    crls.none { it.isCompleteAt(now) && it.isIssuedFor(certificate, issuers) }
+                )
+        } ?: -1
+    }
+
+    private fun X509CRL.isCompleteAt(now: Date): Boolean =
+        criticalExtensionOIDs.isNullOrEmpty() &&
+            getExtensionValue(Extension.issuingDistributionPoint.id) == null &&
+            getExtensionValue(Extension.deltaCRLIndicator.id) == null &&
+            !thisUpdate.after(now) && nextUpdate?.after(now) != false
+
+    private fun X509Certificate.maySignCrls(): Boolean = keyUsage?.getOrNull(CRL_SIGN) != false
+
+    private fun X509Certificate.hasPartialDistributionPoint(): Boolean {
+        val extension = getExtensionValue(Extension.cRLDistributionPoints.id) ?: return false
+        return runCatching {
+            CRLDistPoint.getInstance(ASN1Primitive.fromByteArray(ASN1OctetString.getInstance(extension).octets))
+                .distributionPoints.any { it.reasons != null || it.crlIssuer != null }
+        }.getOrDefault(true)
+    }
+
+    private fun X509CRL.isIssuedFor(certificate: X509Certificate, issuers: List<X509Certificate>): Boolean =
+        issuerX500Principal == certificate.issuerX500Principal && issuers.any { issuer ->
+            issuer.subjectX500Principal == issuerX500Principal && runCatching { verify(issuer.publicKey) }.isSuccess
+        }
 
     private fun pkixParameters(revocationChecker: PKIXRevocationChecker?, crls: List<X509CRL>): PKIXParameters {
         val certStore = CertStore.getInstance(
@@ -193,6 +246,9 @@ class ReaderTrustStoreImpl(
 
     companion object {
         private const val TAG = "ReaderTrustStoreImpl"
+
+        /** The `cRLSign` bit of [X509Certificate.getKeyUsage]. */
+        private const val CRL_SIGN = 6
 
         /** Upper bound for the PKIX path validation, including any CRL download. */
         val DEFAULT_REVOCATION_CHECK_TIMEOUT: Duration = 10.seconds

@@ -22,6 +22,7 @@ import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x509.AuthorityKeyIdentifier
 import org.bouncycastle.asn1.x509.BasicConstraints
 import org.bouncycastle.asn1.x509.CRLDistPoint
+import org.bouncycastle.asn1.x509.CRLNumber
 import org.bouncycastle.asn1.x509.CRLReason
 import org.bouncycastle.asn1.x509.DistributionPoint
 import org.bouncycastle.asn1.x509.DistributionPointName
@@ -29,7 +30,9 @@ import org.bouncycastle.asn1.x509.ExtendedKeyUsage
 import org.bouncycastle.asn1.x509.Extension
 import org.bouncycastle.asn1.x509.GeneralName
 import org.bouncycastle.asn1.x509.GeneralNames
+import org.bouncycastle.asn1.x509.IssuingDistributionPoint
 import org.bouncycastle.asn1.x509.KeyUsage
+import org.bouncycastle.asn1.x509.ReasonFlags
 import org.bouncycastle.cert.X509v2CRLBuilder
 import org.bouncycastle.cert.jcajce.JcaX509CRLConverter
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
@@ -332,9 +335,28 @@ val forgedRevokedCertificateCRL: java.security.cert.X509CRL by lazy {
     buildCrl(revoked = listOf(validCertificate), signingKey = forgerKeyPair)
 }
 
+/** An empty CRL that covers only some reasons, through an issuing distribution point. */
+val partitionedEmptyCRL: java.security.cert.X509CRL by lazy {
+    buildCrl(revoked = emptyList()) {
+        addExtension(
+            Extension.issuingDistributionPoint,
+            true,
+            IssuingDistributionPoint(null, false, false, ReasonFlags(ReasonFlags.keyCompromise), false, false),
+        )
+    }
+}
+
+/** An empty delta CRL. */
+val deltaEmptyCRL: java.security.cert.X509CRL by lazy {
+    buildCrl(revoked = emptyList()) {
+        addExtension(Extension.deltaCRLIndicator, true, CRLNumber(BigInteger.ONE))
+    }
+}
+
 private fun buildCrl(
     revoked: List<X509Certificate>,
     signingKey: KeyPair = trustedKeyPair,
+    extensions: X509v2CRLBuilder.() -> Unit = {},
 ): java.security.cert.X509CRL {
     val issuerName = X500Name(trustedCertificate.subjectX500Principal.name)
     val now = Date()
@@ -348,6 +370,7 @@ private fun buildCrl(
             false,
             extUtils.createAuthorityKeyIdentifier(trustedKeyPair.public)
         )
+        extensions()
     }
 
     val signer = JcaContentSignerBuilder(signatureAlgorithm).build(signingKey.private)

@@ -465,6 +465,62 @@ class ReaderTrustStoreImplTest {
         assertFalse(validateWithUnreadableCrl(RevocationPolicy.HardFail, expectedLog = listOf("CERTIFICATE_PATH_ERROR")))
     }
 
+    @Test
+    fun testSoftFailValidatesWithoutRevocationWhenTheCacheHasNoCrl() {
+        val logged = mutableListOf<String>()
+
+        assertTrue(validateWithoutPlatformCrlDownload(RevocationPolicy.SoftFail, logged))
+        assertEquals(listOf("CERTIFICATE_PATH_CRL_UNAVAILABLE_SOFT_FAIL"), logged)
+    }
+
+    @Test
+    fun testHardFailRejectsWhenTheCacheHasNoCrl() {
+        val logged = mutableListOf<String>()
+
+        assertFalse(validateWithoutPlatformCrlDownload(RevocationPolicy.HardFail, logged))
+        assertEquals(listOf("CERTIFICATE_PATH_ERROR"), logged)
+    }
+
+    @Test
+    fun testCrlCoveringOnlyPartOfTheRevocationsIsNotEnoughToSkipTheDownload() {
+        for (crl in listOf(partitionedEmptyCRL, deltaEmptyCRL)) {
+            val logged = mutableListOf<String>()
+
+            assertTrue(validateWithoutPlatformCrlDownload(RevocationPolicy.SoftFail, logged, CrlCache(fetch = { crl })))
+            assertEquals(listOf("CERTIFICATE_PATH_CRL_UNAVAILABLE_SOFT_FAIL"), logged)
+        }
+    }
+
+    // On a device, a revocation-checking PKIX validation downloads the CRLs it is not given.
+    private fun validateWithoutPlatformCrlDownload(
+        policy: RevocationPolicy,
+        logged: MutableList<String>,
+        crlCache: CrlCache = offline,
+    ): Boolean {
+        val offlineValidator = CertPathValidator.getInstance("PKIX")
+        val downloadingValidator = mockk<CertPathValidator>()
+        every { downloadingValidator.revocationChecker } returns offlineValidator.revocationChecker
+        every { downloadingValidator.validate(any(), any()) } answers {
+            throw AssertionError("PKIX would download the CRL itself")
+        }
+        mockkStatic(CertPathValidator::class)
+        every { CertPathValidator.getInstance("PKIX") } returnsMany listOf(downloadingValidator, offlineValidator)
+        try {
+            val profileValidation = mockk<ProfileValidation>()
+            every { profileValidation.validate(any(), any()) } returns true
+            val trustStore = ReaderTrustStoreImpl(
+                trustedCertificates = listOf(rootCertificate),
+                profileValidation = profileValidation,
+                errorLogger = { _, message, _ -> logged += message },
+                revocationPolicy = policy,
+                crlCache = crlCache,
+            )
+            return trustStore.validateCertificationTrustPath(listOf(leafCertificate, rootCertificate))
+        } finally {
+            unmockkStatic(CertPathValidator::class)
+        }
+    }
+
     // Stands in for a distribution point that serves an HTML page, which the platform reports as a
     // CRLException rather than a network error.
     private fun validateWithUnreadableCrl(
