@@ -97,7 +97,9 @@ class ReaderTrustStoreImpl(
 
         return try {
             val validator = CertPathValidator.getInstance("PKIX")
-            val checker = revocationChecker(validator, revocationPolicy)
+            // A trust anchor is not part of the path (RFC 5280 6.1), so a signer that is one has no revocation status.
+            val checker =
+                if (chainToDocumentSigner.first() in trustedCertificates) null else revocationChecker(validator, revocationPolicy)
             val certPath = CertificateFactory.getInstance("X.509")
                 .generateCertPath(certificationPath)
             // The platform fetches CRLs without a timeout, so bound the path validation.
@@ -180,7 +182,6 @@ class ReaderTrustStoreImpl(
      * is a complete one, current, from an issuer that may sign CRLs, for a certificate whose
      * distribution points are not limited to some reasons or another CRL issuer. An issuing
      * distribution point may only limit the CRL to the certificate's distribution point and kind.
-     * A trust anchor that signs itself is in [chain] too, and PKIX checks it like any other.
      */
     private fun firstWithoutCrl(chain: List<X509Certificate>, crls: List<X509CRL>): Int {
         val now = Date()

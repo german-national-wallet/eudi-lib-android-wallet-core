@@ -152,6 +152,23 @@ class ReaderTrustStoreImplTest {
     }
 
     @Test
+    fun testTrustedSelfSignedSignerCertificateIsNotCheckedForRevocation() {
+        for (policy in listOf(RevocationPolicy.SoftFail, RevocationPolicy.HardFail)) {
+            val logged = mutableListOf<String>()
+            val trustStore = ReaderTrustStoreImpl(
+                trustedCertificates = listOf(rootCertificate),
+                profileValidation = { _, _ -> true },
+                revocationPolicy = policy,
+                errorLogger = { _, message, _ -> logged += message },
+                crlCache = offline,
+            )
+
+            assertTrue(trustStore.validateCertificationTrustPath(listOf(rootCertificate)), "$policy")
+            assertEquals(emptyList(), logged, "$policy")
+        }
+    }
+
+    @Test
     fun testChainIsRejectedWhenTheSignerIsNotIssuedByTheFirstTrustedCertificate() {
         val (_, intermediate, _) = loadValidThreeCertChain()
 
@@ -544,24 +561,11 @@ class ReaderTrustStoreImplTest {
         }
     }
 
-    @Test
-    fun testTrustAnchorSigningItselfIsNotLeftToThePlatformDownload() {
-        val chain = listOf(rootCertificate)
-        val softFailLog = mutableListOf<String>()
-        val hardFailLog = mutableListOf<String>()
-
-        assertTrue(validateWithoutPlatformCrlDownload(RevocationPolicy.SoftFail, softFailLog, chain = chain))
-        assertEquals(listOf("CERTIFICATE_PATH_CRL_UNAVAILABLE_SOFT_FAIL"), softFailLog)
-        assertFalse(validateWithoutPlatformCrlDownload(RevocationPolicy.HardFail, hardFailLog, chain = chain))
-        assertEquals(listOf("CERTIFICATE_PATH_ERROR"), hardFailLog)
-    }
-
     // On a device, a revocation-checking PKIX validation downloads the CRLs it is not given.
     private fun validateWithoutPlatformCrlDownload(
         policy: RevocationPolicy,
         logged: MutableList<String>,
         crlCache: CrlCache = offline,
-        chain: List<X509Certificate> = listOf(leafCertificate, rootCertificate),
     ): Boolean {
         val offlineValidator = CertPathValidator.getInstance("PKIX")
         val downloadingValidator = mockk<CertPathValidator>()
@@ -581,7 +585,7 @@ class ReaderTrustStoreImplTest {
                 revocationPolicy = policy,
                 crlCache = crlCache,
             )
-            return trustStore.validateCertificationTrustPath(chain)
+            return trustStore.validateCertificationTrustPath(listOf(leafCertificate, rootCertificate))
         } finally {
             unmockkStatic(CertPathValidator::class)
         }
