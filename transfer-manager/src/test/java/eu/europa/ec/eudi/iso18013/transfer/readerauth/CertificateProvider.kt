@@ -147,13 +147,7 @@ val validCertificate: X509Certificate by lazy {
         )
 
         // Add CRL Distribution Points
-        val crlDp = GeneralName(
-            GeneralName.uniformResourceIdentifier,
-            "https://example.com/crl.pem"
-        )
-        val generalNames = GeneralNames(crlDp)
-        val distPointName = DistributionPointName(generalNames)
-        val distPoint = DistributionPoint(distPointName, null, null)
+        val distPoint = DistributionPoint(fullName(VALID_CERTIFICATE_CRL_URI), null, null)
         addExtension(
             Extension.cRLDistributionPoints,
             false,
@@ -353,9 +347,20 @@ val deltaEmptyCRL: java.security.cert.X509CRL by lazy {
     }
 }
 
+const val VALID_CERTIFICATE_CRL_URI = "https://example.com/crl.pem"
+
+fun fullName(uri: String) = DistributionPointName(GeneralNames(GeneralName(GeneralName.uniformResourceIdentifier, uri)))
+
+/** A CRL limited by the issuing distribution point [scope]. */
+fun scopedCrl(scope: IssuingDistributionPoint, revoked: List<X509Certificate> = emptyList()): java.security.cert.X509CRL =
+    buildCrl(revoked) { addExtension(Extension.issuingDistributionPoint, true, scope) }
+
+val emptyCRLWithoutNextUpdate: java.security.cert.X509CRL by lazy { buildCrl(revoked = emptyList(), withNextUpdate = false) }
+
 private fun buildCrl(
     revoked: List<X509Certificate>,
     signingKey: KeyPair = trustedKeyPair,
+    withNextUpdate: Boolean = true,
     extensions: X509v2CRLBuilder.() -> Unit = {},
 ): java.security.cert.X509CRL {
     val issuerName = X500Name(trustedCertificate.subjectX500Principal.name)
@@ -364,7 +369,7 @@ private fun buildCrl(
 
     val crlBuilder = X509v2CRLBuilder(issuerName, now).apply {
         revoked.forEach { addCRLEntry(it.serialNumber, now, CRLReason.unspecified) }
-        setNextUpdate(nextUpdate)
+        if (withNextUpdate) setNextUpdate(nextUpdate)
         addExtension(
             Extension.authorityKeyIdentifier,
             false,
