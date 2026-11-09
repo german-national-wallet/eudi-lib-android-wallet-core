@@ -20,9 +20,14 @@ import android.util.Log
 import eu.europa.ec.eudi.iso18013.transfer.readerauth.profile.ProfileValidation
 import org.bouncycastle.asn1.ASN1OctetString
 import org.bouncycastle.asn1.ASN1Primitive
+import org.bouncycastle.asn1.DERIA5String
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x509.CRLDistPoint
+import org.bouncycastle.asn1.x509.DistributionPointName
 import org.bouncycastle.asn1.x509.Extension
+import org.bouncycastle.asn1.x509.GeneralName
+import org.bouncycastle.asn1.x509.GeneralNames
+import org.bouncycastle.asn1.x509.IssuingDistributionPoint
 import java.security.InvalidAlgorithmParameterException
 import java.security.NoSuchAlgorithmException
 import java.security.cert.CRLException
@@ -170,28 +175,59 @@ class ReaderTrustStoreImpl(
     }
 
     /**
-     * The index of the first certificate in [chain], other than a trust anchor, that no CRL of [crls]
-     * covers completely, or -1. PKIX looks up further CRLs itself for a certificate a CRL only partly
-     * covers, so a covering CRL is a complete one, current, from an issuer that may sign CRLs, for a
-     * certificate whose distribution points are not limited to some reasons or another CRL issuer.
+     * The index of the first certificate in [chain] that no CRL of [crls] covers completely, or -1.
+     * PKIX looks up further CRLs itself for a certificate a CRL only partly covers, so a covering CRL
+     * is a complete one, current, from an issuer that may sign CRLs, for a certificate whose
+     * distribution points are not limited to some reasons or another CRL issuer. An issuing
+     * distribution point may only limit the CRL to the certificate's distribution point and kind.
+     * A trust anchor that signs itself is in [chain] too, and PKIX checks it like any other.
      */
     private fun firstWithoutCrl(chain: List<X509Certificate>, crls: List<X509CRL>): Int {
         val now = Date()
         return chain.indices.firstOrNull { index ->
             val certificate = chain[index]
             val issuers = (listOfNotNull(chain.getOrNull(index + 1)) + trustedCertificates).filter { it.maySignCrls() }
-            certificate !in trustedCertificates && (
-                certificate.hasPartialDistributionPoint() ||
-                    crls.none { it.isCompleteAt(now) && it.isIssuedFor(certificate, issuers) }
-                )
+            certificate.hasPartialDistributionPoint() ||
+                crls.none { it.isCompleteFor(certificate, now) && it.isIssuedFor(certificate, issuers) }
         } ?: -1
     }
 
-    private fun X509CRL.isCompleteAt(now: Date): Boolean =
-        criticalExtensionOIDs.isNullOrEmpty() &&
-            getExtensionValue(Extension.issuingDistributionPoint.id) == null &&
+    private fun X509CRL.isCompleteFor(certificate: X509Certificate, now: Date): Boolean =
+        criticalExtensionOIDs.orEmpty().all { it == Extension.issuingDistributionPoint.id } &&
             getExtensionValue(Extension.deltaCRLIndicator.id) == null &&
-            !thisUpdate.after(now) && nextUpdate?.after(now) != false
+            !thisUpdate.after(now) && nextUpdate?.after(now) == true &&
+            coversScopeOf(certificate)
+
+    private fun X509CRL.coversScopeOf(certificate: X509Certificate): Boolean {
+        val extension = getExtensionValue(Extension.issuingDistributionPoint.id) ?: return true
+        return runCatching {
+            val scope = IssuingDistributionPoint.getInstance(
+                ASN1Primitive.fromByteArray(ASN1OctetString.getInstance(extension).octets)
+            )
+            val isCa = certificate.basicConstraints >= 0
+            val sameDistributionPoint = scope.distributionPoint?.let { name ->
+                val uris = name.uris() ?: return@runCatching false
+                certificate.distributionPointUris().any { it in uris }
+            } ?: true
+            scope.onlySomeReasons == null && !scope.isIndirectCRL && !scope.onlyContainsAttributeCerts() &&
+                !(scope.onlyContainsUserCerts() && isCa) && !(scope.onlyContainsCACerts() && !isCa) &&
+                sameDistributionPoint
+        }.getOrDefault(false)
+    }
+
+    private fun X509Certificate.distributionPointUris(): List<String> {
+        val extension = getExtensionValue(Extension.cRLDistributionPoints.id) ?: return emptyList()
+        return CRLDistPoint.getInstance(ASN1Primitive.fromByteArray(ASN1OctetString.getInstance(extension).octets))
+            .distributionPoints.flatMap { it.distributionPoint?.uris().orEmpty() }
+    }
+
+    // The URIs of a full name, or null for a relative name or one without a URI.
+    private fun DistributionPointName.uris(): List<String>? =
+        takeIf { type == DistributionPointName.FULL_NAME }
+            ?.let { GeneralNames.getInstance(name).names }
+            ?.filter { it.tagNo == GeneralName.uniformResourceIdentifier }
+            ?.map { DERIA5String.getInstance(it.name).string }
+            ?.takeIf { it.isNotEmpty() }
 
     private fun X509Certificate.maySignCrls(): Boolean = keyUsage?.getOrNull(CRL_SIGN) != false
 

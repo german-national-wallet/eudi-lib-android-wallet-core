@@ -24,6 +24,10 @@ import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
 import io.mockk.verify
+import org.bouncycastle.asn1.x509.DistributionPointName
+import org.bouncycastle.asn1.x509.GeneralName
+import org.bouncycastle.asn1.x509.GeneralNames
+import org.bouncycastle.asn1.x509.IssuingDistributionPoint
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.junit.After
 import org.junit.Before
@@ -297,6 +301,21 @@ class ReaderTrustStoreImplTest {
         assertFalse(validateWithCrl(RevocationPolicy.HardFail, forgedEmptyCRL))
     }
 
+    @Test
+    fun testCrlScopedToTheCertificatesDistributionPointIsUsed() {
+        val scope = IssuingDistributionPoint(fullName(VALID_CERTIFICATE_CRL_URI), true, false, null, false, false)
+
+        assertTrue(validateWithCrl(RevocationPolicy.HardFail, scopedCrl(scope)))
+        assertFalse(validateWithCrl(RevocationPolicy.HardFail, scopedCrl(scope, revoked = listOf(leafCertificate))))
+    }
+
+    @Test
+    fun testCrlScopedWithoutADistributionPointIsUsed() {
+        val scope = IssuingDistributionPoint(null, true, false, null, false, false)
+
+        assertTrue(validateWithCrl(RevocationPolicy.HardFail, scopedCrl(scope)))
+    }
+
     private fun validateWithCrl(policy: RevocationPolicy, crl: X509CRL): Boolean {
         val profileValidation = mockk<ProfileValidation>()
         every { profileValidation.validate(any(), any()) } returns true
@@ -491,11 +510,58 @@ class ReaderTrustStoreImplTest {
         }
     }
 
+    @Test
+    fun testCrlWithoutNextUpdateIsNotEnoughToSkipTheDownload() {
+        val logged = mutableListOf<String>()
+
+        assertTrue(
+            validateWithoutPlatformCrlDownload(RevocationPolicy.SoftFail, logged, CrlCache(fetch = { emptyCRLWithoutNextUpdate }))
+        )
+        assertEquals(listOf("CERTIFICATE_PATH_CRL_UNAVAILABLE_SOFT_FAIL"), logged)
+    }
+
+    @Test
+    fun testCrlThatMayNotCoverTheCertificateIsNotEnoughToSkipTheDownload() {
+        val uri = fullName(VALID_CERTIFICATE_CRL_URI)
+        val crls = mapOf(
+            "another distribution point" to
+                scopedCrl(IssuingDistributionPoint(fullName("https://example.com/other.pem"), true, false, null, false, false)),
+            "a distribution point without a URI" to scopedCrl(
+                IssuingDistributionPoint(
+                    DistributionPointName(GeneralNames(GeneralName(GeneralName.dNSName, "example.com"))),
+                    true, false, null, false, false,
+                )
+            ),
+            "CA certificates only" to scopedCrl(IssuingDistributionPoint(uri, false, true, null, false, false)),
+            "an indirect CRL" to scopedCrl(IssuingDistributionPoint(uri, false, false, null, true, false)),
+            "attribute certificates only" to scopedCrl(IssuingDistributionPoint(uri, false, false, null, false, true)),
+        )
+        for ((case, crl) in crls) {
+            val logged = mutableListOf<String>()
+
+            assertTrue(validateWithoutPlatformCrlDownload(RevocationPolicy.SoftFail, logged, CrlCache(fetch = { crl })), case)
+            assertEquals(listOf("CERTIFICATE_PATH_CRL_UNAVAILABLE_SOFT_FAIL"), logged, case)
+        }
+    }
+
+    @Test
+    fun testTrustAnchorSigningItselfIsNotLeftToThePlatformDownload() {
+        val chain = listOf(rootCertificate)
+        val softFailLog = mutableListOf<String>()
+        val hardFailLog = mutableListOf<String>()
+
+        assertTrue(validateWithoutPlatformCrlDownload(RevocationPolicy.SoftFail, softFailLog, chain = chain))
+        assertEquals(listOf("CERTIFICATE_PATH_CRL_UNAVAILABLE_SOFT_FAIL"), softFailLog)
+        assertFalse(validateWithoutPlatformCrlDownload(RevocationPolicy.HardFail, hardFailLog, chain = chain))
+        assertEquals(listOf("CERTIFICATE_PATH_ERROR"), hardFailLog)
+    }
+
     // On a device, a revocation-checking PKIX validation downloads the CRLs it is not given.
     private fun validateWithoutPlatformCrlDownload(
         policy: RevocationPolicy,
         logged: MutableList<String>,
         crlCache: CrlCache = offline,
+        chain: List<X509Certificate> = listOf(leafCertificate, rootCertificate),
     ): Boolean {
         val offlineValidator = CertPathValidator.getInstance("PKIX")
         val downloadingValidator = mockk<CertPathValidator>()
@@ -515,7 +581,7 @@ class ReaderTrustStoreImplTest {
                 revocationPolicy = policy,
                 crlCache = crlCache,
             )
-            return trustStore.validateCertificationTrustPath(listOf(leafCertificate, rootCertificate))
+            return trustStore.validateCertificationTrustPath(chain)
         } finally {
             unmockkStatic(CertPathValidator::class)
         }
